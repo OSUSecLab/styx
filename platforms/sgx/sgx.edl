@@ -1,0 +1,41 @@
+enclave {
+    include "sgx_eid.h"
+    include "dcap_dh_def.h"
+    include "dh_session_datatypes.h"
+
+    include "sgx_trts.h"
+    include "sgx_report.h"
+
+    trusted{
+#ifdef xxx
+	public uint32_t ecall_session_request([out] pcd_dh_dcap_msg1_t *dh_msg1,
+                          [out] uint32_t *session_id);
+	public uint32_t ecall_exchange_report([in] pcd_dh_dcap_msg2_t *dh_msg2,
+                          [out] pcd_dh_dcap_msg3_t *dh_msg3,
+                          uint32_t session_id);
+	public uint32_t ecall_generate_response([in, size = req_message_size] secure_message_t* req_message,
+                                     size_t req_message_size,
+                                     size_t max_payload_size,
+                                     [out, size=resp_message_size] secure_message_t* resp_message,
+                                     size_t resp_message_size,
+                		     uint32_t session_id);
+	public uint32_t ecall_end_session(uint32_t session_id);
+#endif
+	};
+
+    untrusted{
+	void ocall_print([in, string]const char* str);
+
+	uint32_t ocall_ecdsa_get_qe_target_info([out] sgx_target_info_t* qe_target_info);
+	uint32_t ocall_ecdsa_quote_generation([out]uint32_t* quote_size, [in] sgx_report_t* app_report, [out, size = SGX_QUOTE3_BUFFER_SIZE] uint8_t* quote);
+	uint32_t ocall_ecdsa_quote_verification([in, size = SGX_QUOTE3_BUFFER_SIZE] uint8_t* quote_buffer, uint32_t quote_size);
+
+
+	uint32_t ocall_session_request([out] pcd_dh_dcap_msg1_t* dh_msg1, [out] uint32_t* session_id, [in, string] const char *target_path);
+	uint32_t ocall_exchange_report([in] pcd_dh_dcap_msg2_t *dh_msg2, [out] pcd_dh_dcap_msg3_t *dh_msg3, uint32_t session_id, [in, string] const char *target_path);
+	uint32_t ocall_send_request(uint32_t session_id, [in, size = req_message_size] secure_message_t* req_message, size_t req_message_size, size_t max_payload_size, [out, size=resp_message_size] secure_message_t* resp_message, size_t resp_message_size, [in, string] const char *target_path);
+	uint32_t ocall_end_session(uint32_t session_id, [in, string] const char *target_path);
+
+    };
+
+};
