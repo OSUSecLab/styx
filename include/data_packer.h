@@ -6,7 +6,7 @@
 #include "data.h"
 #include "tag.h"
 
-#include "policy/policy.h"
+#include "policy/policy_def.h"
 #include "crypto/crypto.h"
 
 int pcd_data_packer_generate_data(void *data, size_t data_size,
@@ -14,6 +14,7 @@ int pcd_data_packer_generate_data(void *data, size_t data_size,
 				pcd_delegator_addr_t *delegator_addr,
 				pcd_policy_t *policy,
 				pcd_tag_t *tags, uint32_t tag_count,
+				void *attributes, size_t attribute_size,
 				pcd_crypto_algo_t crypto_algo, void *key,
 				pcd_enc_data_t **out_data);
 

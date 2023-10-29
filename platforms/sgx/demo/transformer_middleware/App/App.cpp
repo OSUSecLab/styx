@@ -33,7 +33,6 @@
 #include <sched.h>
 #include <sys/sysinfo.h>
 #include <unistd.h>
-#include <fcntl.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -43,7 +42,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
 #include <sys/un.h>
 #include <errno.h>
 
@@ -62,6 +60,7 @@ extern "C" {
 // Needed to create enclave and do ecall.
 #include "sgx_urts.h"
 
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
@@ -72,7 +71,7 @@ extern "C" {
 
 sgx_enclave_id_t g_consumer_enclave_id = -1;
 
-extern "C" void ocall_print(const char* str) {
+void ocall_print(const char* str) {
 	printf("%s", str);
 }
 
@@ -85,7 +84,7 @@ int load_enclave()
     ret = sgx_create_enclave(GATEWAY_ENCLAVE_NAME, SGX_DEBUG_FLAG, &token, &update, &g_consumer_enclave_id, NULL);
     if (ret != SGX_SUCCESS) 
     {
-        printf("Producer Owner App: Failed to load enclave %s. Error code is 0x%x.\n", GATEWAY_ENCLAVE_NAME, ret);
+        printf("Consumer App: Failed to load enclave %s. Error code is 0x%x.\n", GATEWAY_ENCLAVE_NAME, ret);
         return -1;
     }
 
@@ -93,6 +92,10 @@ int load_enclave()
 }
 
 #define BUFFER_SIZE 8192
+
+extern "C" {
+#include "attestation_msgs.h"
+}
 
 static int client_send_receive(char *req_msg, size_t req_size, char **resp_msg, size_t *resp_size, char *target_path)
 {
@@ -109,6 +112,8 @@ static int client_send_receive(char *req_msg, size_t req_size, char **resp_msg, 
         return -1;
     }
 
+	printf("INFO: req_msg type is %d\n", ((pcd_sgx_attestation_msg_t*)req_msg)->header.type);
+
     server_addr.sun_family = AF_UNIX;
     
     strcpy(server_addr.sun_path, target_path);
@@ -116,11 +121,10 @@ static int client_send_receive(char *req_msg, size_t req_size, char **resp_msg, 
 
     if (connect(server_sock_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) != 0)
     {
-        printf("connection error, %s, line %d.\n", strerror(errno), __LINE__);
+		printf("connection to %s error, %s, line %d.\n", target_path, strerror(errno), __LINE__);
         ret = -1;
         goto CLEAN;
     }
-
 
     if ((byte_num = send(server_sock_fd, reinterpret_cast<char *>(req_msg), static_cast<int>(req_size), 0)) == -1)
     {
@@ -220,65 +224,35 @@ char *read_file_to_buffer(const char *filename, size_t *ret_size) {
 }
 
 char cmdbuffer[100];
+char targetbuffer[100];
 char outbuffer[100];
 
-typedef uint8_t sha256_t[32]; 
-typedef uint8_t uuid_t[16]; 
+#define PCD_APP_STACK_SIZE (4 * 1024 * 1024)
+#define PCD_APP_HEAP_SIZE (16 * 1024 * 1024)
+
+
+char path_buffer[100];
 
 int main(int argc, char *argv[])
 {
     (void)argc;
     (void)argv;
-    int target_id;
-    size_t out_len;
     int ret;
     uint32_t status;
-    int if_continue = 1;
-    FILE *fp = NULL;
-    long fsize;
-    char *filebuffer;
-    char *output_data;
-    size_t data_size;
-    uint64_t number_count;
-    uint64_t *input_buffer;
-    int i;
-    uint8_t rule_mask;
+	sgx_status_t sgx_status;
+    char *module_buffer;
+    size_t module_size;
+    char *uuid_buffer;
+    size_t uuid_size;
+    int disc_count = 0;
+    uint32_t app_argv[2] = {0, 0};
 
-    char *uuid_path;
-    char *hash_path;
 
-    uint8_t *owner_id;
-    uint8_t *program_hash;
-    size_t read_buffer_size;
+    char allow_dir[] = "/home/nskernel/pcd/platforms/sgx/demo/";
+    char allow_dir_2[] = "/home/nskernel/pcd/platforms/sgx/demo/transformer_middleware/";
+    char *static_allow_list[2] = { allow_dir,  allow_dir_2};
 
-    if (argc != 3) {
-	    printf("usage: producer_owner <uuid path> <hash path>\n");
-		return -1;
-    }
-
-    uuid_path = argv[1];
-    hash_path = argv[2];
-
-    owner_id = (uint8_t *)read_file_to_buffer(uuid_path, &read_buffer_size);
-    if (owner_id == NULL) {
-        printf("ERROR: Failed to read owner UUID\n");
-        return -1;
-    }
-    if (read_buffer_size != sizeof(uuid_t)) {
-        printf("ERROR: UUID size incorrect! read_buffer_size = %ld\n", read_buffer_size);
-        return -1;
-    }
-
-    program_hash = (uint8_t *)read_file_to_buffer(hash_path, &read_buffer_size);
-    if (program_hash == NULL) {
-        printf("ERROR: Failed to read prgram hash\n");
-        return -1;
-    }
-    if (read_buffer_size != sizeof(sha256_t)) {
-        printf("ERROR: Hash size incorrect! read_buffer_size = %ld\n", read_buffer_size);
-        return -1;
-    }
-
+    printf("Allow %s\n", static_allow_list[0]);
 
     // Create enclave
     if (load_enclave()) {
@@ -286,111 +260,94 @@ int main(int argc, char *argv[])
     }
 
     // Initalise the environment
-	ecall_init_env(g_consumer_enclave_id, owner_id, program_hash);
-    free(owner_id);
-    free(program_hash);
-
+	ecall_init_env(g_consumer_enclave_id);
 	pcd_sgx_attestation_register_send_receive((void *)&client_send_receive);
 
-    output_data = (char *)malloc(8192);
-    if (output_data == NULL) {
-        printf("ERROR: Failed to malloc output_data\n");
-        if_continue = false;
-    }
+    printf("Enter DISC count> ");
+    scanf("%d", &disc_count);
 
-    while (if_continue) {
-        printf("Enter command: ");
-        scanf("%s", cmdbuffer);
-        if (cmdbuffer[1] != 0) {
-            printf("Error: Unknown command\n");
-            continue;
+    while (disc_count--) {
+        printf("Enter DISC module path> ");
+        scanf("%s", path_buffer);
+        module_buffer = read_file_to_buffer(path_buffer, &module_size);
+        if (module_buffer == NULL) {
+            printf("Failed to read module\n");
+            sgx_destroy_enclave(g_consumer_enclave_id);
+            return -1;
+        }
+        
+        printf("Enter DISC UUID path> ");
+        scanf("%s", path_buffer);
+        uuid_buffer = read_file_to_buffer(path_buffer, &uuid_size);
+        if (uuid_buffer == NULL) {
+            printf("Failed to read UUID\n");
+            sgx_destroy_enclave(g_consumer_enclave_id);
+            return -1;
+        }
+        if (uuid_size != 16) {
+            printf("Incorrect UUID size of %ld\n", uuid_size);
+            sgx_destroy_enclave(g_consumer_enclave_id);
+            return -1;
         }
 
-        switch (cmdbuffer[0]) {
-        case 'h':
-            printf("h:                                              help\n");
-            printf("o <uuid path>:                                  load new owner uuid\n");
-            printf("h <hash path>:                                  load new target program hash\n");
-            printf("g <num count> <nums> <rule mask> <output path>: generate data\n");
-            printf("p:                                              push secret to remote\n");
-            printf("q:                                              quit\n");
-            break;
-        case 'o':
-            scanf("%s", cmdbuffer);
-            owner_id = (uint8_t *)read_file_to_buffer(cmdbuffer, &read_buffer_size);
-            if (owner_id == NULL) {
-                printf("ERROR: Failed to read owner UUID\n");
-                continue;
-            }
-            if (read_buffer_size != sizeof(uuid_t)) {
-                printf("ERROR: UUID size incorrect! read_buffer_size = %ld\n", read_buffer_size);
-                free(owner_id);
-                continue;
-            }
-            ecall_change_owner_id(g_consumer_enclave_id, owner_id);
-            free(owner_id);
-            break;
-        case 't':
-            scanf("%s", cmdbuffer);
-            program_hash = (uint8_t *)read_file_to_buffer(cmdbuffer, &read_buffer_size);
-            if (program_hash == NULL) {
-                printf("ERROR: Failed to read prgram hash\n");
-                continue;
-            }
-            if (read_buffer_size != sizeof(sha256_t)) {
-                printf("ERROR: Hash size incorrect! read_buffer_size = %ld\n", read_buffer_size);
-                continue;
-            }
-            ecall_change_target_hash(g_consumer_enclave_id, program_hash);
-            free(program_hash);
-            break;
-        case 'p':
-            ecall_push_secret_to_remote(g_consumer_enclave_id, &ret);
-			if (ret != 0) {
-				printf("ERROR: push to remote failed with %d\n", ret);
-			}
-            break;
-        case 'g':
-            scanf("%ld", &number_count);
-            input_buffer = (uint64_t *)malloc(sizeof(uint64_t) * number_count);
-            for (i = 0; i < number_count; i++) {
-                scanf("%ld", &input_buffer[i]);
-            }
-            scanf("%hhd %s", &rule_mask, cmdbuffer);
-
-            // Produce
-            if ((status = ecall_produce_data(g_consumer_enclave_id, (int *)&ret, input_buffer, number_count, output_data, &data_size, 8192, rule_mask)) != SGX_SUCCESS) {
-				printf("ERROR: ecall_produce_data failed with %d\n", status);
-                if_continue = false;
-                free(input_buffer);
-                continue;
-			}
-            free(input_buffer);
-            printf("INFO: ecall_produce_data returned %d\n", ret);
-            if (ret != 0) {
-                printf("ERROR: ecall_produce_data failed to produce data\n");
-                if_continue = false;
-                continue;
-            }
-
-            // Open file
-            fp = fopen(cmdbuffer, "w+");
-            if (fp == NULL) {
-                printf("Error: Failed to open file %s\n", cmdbuffer);
-                continue;
-            }
-            fwrite(output_data, data_size, 1, fp);
-            fclose(fp);
-            
-            break;
-        case 'q':
-            if_continue = false;
-            break;
-        default:
-            printf("Error: Unknown command\n");
+        // Load
+        sgx_status = ecall_load_disc(g_consumer_enclave_id, &ret, module_buffer, module_size, uuid_buffer);
+        if (sgx_status != SGX_SUCCESS) {
+            printf("ERROR: ecall_load_disc failed with %d\n", sgx_status);
+            sgx_destroy_enclave(g_consumer_enclave_id);
+            return -1;
         }
+        if (ret != 0) {
+            printf("ERROR: ecall_load_disc returned %d\n", ret);
+            sgx_destroy_enclave(g_consumer_enclave_id);
+            return -1;
+        }
+        //free(module_buffer);
+        // Cannot fuckin free because some idiots in bytealliance
+        // uses strings from the original code buffer
+        free(uuid_buffer);
+        printf("INFO: Loaded\n");
     }
 
+    // Load the app
+    printf("Enter app module path> ");
+    scanf("%s", path_buffer);
+    module_buffer = read_file_to_buffer(path_buffer, &module_size);
+    if (module_buffer == NULL) {
+        printf("Failed to read app module\n");
+        sgx_destroy_enclave(g_consumer_enclave_id);
+        return -1;
+    }
+
+    printf("Enter custodian ID UUID path> ");
+    scanf("%s", path_buffer);
+    uuid_buffer = read_file_to_buffer(path_buffer, &uuid_size);
+    if (uuid_buffer == NULL) {
+        printf("Failed to read UUID\n");
+        sgx_destroy_enclave(g_consumer_enclave_id);
+        return -1;
+    }
+    if (uuid_size != 16) {
+        printf("Incorrect UUID size of %ld\n", uuid_size);
+        sgx_destroy_enclave(g_consumer_enclave_id);
+        return -1;
+    }
+
+    sgx_status = ecall_run_app(g_consumer_enclave_id, &ret, (uint8_t *)module_buffer, module_size, uuid_buffer, static_allow_list, 2, 
+                                PCD_APP_STACK_SIZE, PCD_APP_HEAP_SIZE, (uint32_t *)app_argv, 2);
+    if (sgx_status != SGX_SUCCESS) {
+        printf("ERROR: ecall_run_app failed with %d\n", sgx_status);
+        sgx_destroy_enclave(g_consumer_enclave_id);
+        return -1;
+    }
+    if (ret != 0) {
+        printf("ERROR: ecall_run_app returned %d\n", ret);
+        sgx_destroy_enclave(g_consumer_enclave_id);
+        return -1;
+    }
+
+    // We don't free anything anymore because the middleware is exiting
+    // so we don't care
     printf("Exiting...\n");
     sgx_destroy_enclave(g_consumer_enclave_id);
     printf("Done\n");

@@ -4,26 +4,30 @@
 #include <stdint.h>
 
 #include "tag.h"
+#include "runtime.h"
+#include "data.h"
+#include "dataset.h"
 
-typedef uint32_t pcd_policy_type_t;
-#define PCD_POLICY_SIMPLE		0x0000
+#include "policy/policy_def.h"
 
-#define PCD_POLICY_TYPE_MAX_INDEX	0x0000
+typedef struct _pcd_policy_disc_t {
+	pcd_policy_type_t disc_id;
+	pcd_module_t *disc_module;
+} pcd_policy_disc_t;
 
-typedef struct {
-	int (*compare_cred)(void *, void *);
-	int (*eval)(pcd_tag_t *tag, void *cred, void *policy);
-} pcd_policy_type_struct_t;
+#ifndef PCD_POLICY_TYPE_MAX_INDEX
+#define PCD_POLICY_TYPE_MAX_INDEX	0x0008
+#endif
 
-typedef struct {
-	pcd_policy_type_t type;
-	uint64_t policy_size;
+#ifndef PCD_POLICY_STACK_SIZE
+#define PCD_POLICY_STACK_SIZE (4 * 1024 * 1024)
+#endif
 
-	uint8_t policy_buffer[];
-} __attribute__((packed)) pcd_policy_t;
+#ifndef PCD_POLICY_HEAP_SIZE
+#define PCD_POLICY_HEAP_SIZE (16 * 1024 * 1024)
+#endif
 
-pcd_policy_type_struct_t *pcd_policy_get(pcd_policy_type_t type_id);
-int pcd_policy_type_register(pcd_policy_type_struct_t *policy_type, pcd_policy_type_t type_id);
-int pcd_policy_init(void);
+int pcd_policy_eval_over_dataset(pcd_dataset_t *dataset, pcd_identity_t *program_owner_id);
+int pcd_policy_load_disc(char *module_buffer, size_t module_size, pcd_policy_type_t *type);
 
 #endif

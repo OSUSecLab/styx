@@ -81,7 +81,7 @@ endif
 
 App_Cpp_Objects := $(App_Cpp_Files:.cpp=.o)
 
-App_Name := producer_owner
+App_Name := transformer
 
 ######## Enclave Settings ########
 
@@ -97,15 +97,15 @@ Crypto_Library_Name := sgx_tcrypto
 Enclave_Cpp_Files := Enclave/Enclave.cpp
 
 Enclave_Include_Paths := -IEnclave -I$(PCD_ROOT)/include \
+			 -I$(PCD_ROOT)/runtime/wamr/wasm-micro-runtime/core/iwasm/include \
                          -I$(PCD_SGX_ROOT)/include \
 						 -I$(PCD_SGX_ROOT)/attestation/include \
                          -I$(SGX_SDK)/include \
                          -I$(SGX_SDK)/include/tlibc \
                          -I$(SGX_SDK)/include/stlport \
-			 -I../include \
 						 -I$(SGX_SDK)/include/libcxx
 
-Enclave_C_Flags := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fstack-protector $(Enclave_Include_Paths) -DPCD_CONFIG_ROLE_CHALLENGER
+Enclave_C_Flags := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fstack-protector $(Enclave_Include_Paths) -DPCD_CONFIG_ROLE_CHALLENGER -DPCD_CONFIG_RUNTIME_WAMR
 Enclave_Cpp_Flags := $(Enclave_C_Flags) -std=c++03 -nostdinc++
 
 Enclave_Security_Link_Flags := -Wl,-z,relro,-z,now,-z,noexecstack
@@ -159,7 +159,8 @@ App/Enclave_u.c: $(SGX_EDGER8R) Enclave/Enclave.edl
 	@cd App && $(SGX_EDGER8R) --untrusted ../Enclave/Enclave.edl \
 		--search-path ../Enclave \
 		--search-path $(SGX_SDK)/include \
-		--search-path $(PCD_SGX_ROOT)/
+		--search-path $(PCD_SGX_ROOT)/ \
+		--search-path $(PCD_ROOT)/runtime/wamr/wasm-micro-runtime/core/shared/platform/linux-sgx/
 	@echo "GEN  =>  $@"
 
 App/Enclave_u.o: App/Enclave_u.c
@@ -185,7 +186,8 @@ Enclave/Enclave_t.h: $(SGX_EDGER8R) Enclave/Enclave.edl
 	@cd Enclave && $(SGX_EDGER8R) --trusted ../Enclave/Enclave.edl \
 		--search-path ../Enclave \
 		--search-path $(SGX_SDK)/include \
-		--search-path $(PCD_SGX_ROOT)/
+		--search-path $(PCD_SGX_ROOT)/ \
+		--search-path $(PCD_ROOT)/runtime/wamr/wasm-micro-runtime/core/shared/platform/linux-sgx/
 	@echo "GEN  =>  $@"
 
 Enclave/Enclave_t.c: Enclave/Enclave_t.h

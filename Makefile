@@ -1,26 +1,5 @@
-# -----------------------------------------------------------------------------
-# Function : parent-dir
-# Arguments: 1: path
-# Returns  : Parent dir or path of $1, with final separator removed.
-# -----------------------------------------------------------------------------
-parent-dir = $(patsubst %/,%,$(dir $(1:%/=%)))
-
-# -----------------------------------------------------------------------------
-# Macro    : my-dir
-# Returns  : the directory of the current Makefile
-# Usage    : $(my-dir)
-# -----------------------------------------------------------------------------
-my-dir = $(realpath $(call parent-dir,$(lastword $(MAKEFILE_LIST))))
-
-
-ROOT_DIR              := $(call my-dir)
-
 include config.mk
 include buildenv.mk
-
-# Select platform
-
-include platforms/$(CONFIG_PLATFORM)/platform_buildenv.mk
 
 Trusted_Lib_Name := libtpcd.a
 Untrusted_Lib_Name := libupcd.a
@@ -43,11 +22,24 @@ clean:
 	rm -f $(Untrusted_C_Objs)
 	rm -f $(Untrusted_Cpp_Objs)
 
+# Build runtime lib
+
+ifdef CONFIG_RUNTIME_WAMR
+ifeq ($(CONFIG_RUNTIME_WAMR), y)
+$(Untrusted_Runtime_Libs) $(Trusted_Runtime_Libs):
+	@echo "  MAKE  runtime/wamr"
+	@make -C runtime/wamr
+endif
+endif
+
 # Build enclave lib
 
-$(Trusted_Lib_Name): $(C_Objs) $(Cpp_Objs)
+$(Trusted_Lib_Name): $(C_Objs) $(Cpp_Objs) $(Trusted_Runtime_Libs)
 	@echo "  AR    $@"
-	@$(AR) rcs $@ $^
+ifneq ($(Trusted_Runtime_Libs), )
+	@cp $(Trusted_Runtime_Libs) $@
+endif
+	@$(AR) rcs $@ $(C_Objs) $(Cpp_Objs)
 
 
 $(C_Objs): %.o: %.c
@@ -61,10 +53,12 @@ $(Cpp_Objs): %.o: %.cpp
 
 # Build untrusted lib
 
-
-$(Untrusted_Lib_Name): $(Untrusted_C_Objs) $(Untrusted_Cpp_Objs)
+$(Untrusted_Lib_Name): $(Untrusted_C_Objs) $(Untrusted_Cpp_Objs) $(Untrusted_Runtime_Libs)
 	@echo "  AR    $@"
-	@$(AR) rcs $@ $^
+ifneq ($(Untrusted_Runtime_Libs), )
+	@cp $(Untrusted_Runtime_Libs) $@
+endif
+	@$(AR) rcs $@ $(Untrusted_C_Objs) $(Untrusted_Cpp_Objs)
 
 
 $(Untrusted_C_Objs): %.o: %.c

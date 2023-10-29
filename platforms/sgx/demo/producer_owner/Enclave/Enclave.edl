@@ -36,12 +36,14 @@ enclave {
     include "sgx_report.h"
 
 	from "sgx_tstdc.edl" import sgx_thread_wait_untrusted_event_ocall, sgx_thread_set_untrusted_event_ocall;
-	from "sgx.edl" import *;
+	from "sgx_producer.edl" import *;
 
     trusted{
 	    public int ecall_push_secret_to_remote();
-        public int ecall_produce_data(uint64_t a, uint64_t b, [user_check] void *output_data, [out] size_t *output_size, size_t max_size);
-		public void ecall_init_env();
+        public int ecall_produce_data([user_check] uint64_t *numbers, uint64_t number_count, [user_check] void *output_data, [out] size_t *output_size, size_t max_size, uint8_t rule_mask);
+		public void ecall_init_env([user_check] uint8_t *input_owner_id, [user_check] uint8_t *target_program_hash);
+        public void ecall_change_target_hash([user_check] uint8_t *target_program_hash);
+        public void ecall_change_owner_id([user_check] uint8_t *new_owner_id);
     };
 
     untrusted{

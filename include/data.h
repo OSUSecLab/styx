@@ -4,7 +4,13 @@
 #include <stdint.h>
 
 #include "identity.h"
-#include <crypto/crypto.h>
+#include "crypto/crypto.h"
+
+#include "policy/policy_def.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef uint64_t pcd_protocol_version_t;
 
@@ -27,13 +33,22 @@ typedef struct pcd_enc_data {
 
 // Plaintext payload before encryption
 typedef struct pcd_payload {
-	// Data + Policy + Tags
-	size_t data_size;
-	size_t policy_size;
-	size_t tag_size;
+	// Data + Policy + Tags + Attributes
+	uint64_t data_size;
+	uint64_t policy_size;
+	uint64_t tag_size;
+	uint64_t attribute_size;
 
 	uint8_t payload[];
 } __attribute__((packed)) pcd_payload_t;
 
+static inline pcd_policy_t *pcd_get_policy_from_payload(pcd_payload_t *payload) 
+{
+	return (pcd_policy_t *)(((char *)payload->payload) + payload->data_size);
+}
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

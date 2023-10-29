@@ -9,10 +9,9 @@
 #include "policy/policy.h"
 #include "crypto/crypto.h"
 
-int pcd_data_unpacker_extract_data(pcd_enc_data_t *input_data,
-				void **output_data, size_t *data_size,
-				pcd_policy_t **output_policy, 
-				pcd_tag_t **output_tags, uint32_t *tag_count,
-				pcd_identity_t *owner_id, void *key);
+int pcd_data_unpacker_decrypt_payload(void *enc_payload_with_mac, size_t enc_size_with_mac,
+				pcd_identity_t *owner_id,
+				pcd_crypto_algo_t crypto_algo, void *key,
+				pcd_payload_t **payload);
 
 #endif

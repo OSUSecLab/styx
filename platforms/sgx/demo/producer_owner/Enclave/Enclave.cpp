@@ -42,19 +42,20 @@
 
 extern "C" {
 
-#define PCD_CONFIG_POLICY_SIMPLE
 #define PCD_CONFIG_CRYPTO_AES_GCM
 
-#include "producer.h"
 #include "secret.h"
 
 #include "secret_owner.h"
 
-#include "policy/policy.h"
-#include "policy/simple.h"
+#include "policy/policy_def.h"
 
 #include "crypto/aes_gcm.h"
+#include "crypto/sha256.h"
 
+#include "data_generator.h"
+
+#include "policy_disc.h"
 #include "user_data.h"
 #include "attestation/sgx_challenger.h"
 }
@@ -86,6 +87,13 @@ extern "C" int printf(const char* fmt, ...) {
 	return (int)strnlen(buf, BUFSIZ - 1) + 1;
 }
 
+void pcd_policy_disc_print_hash(uint8_t *hash_ptr) {
+	int i;
+	for (i = 0; i < 32; i++) {
+		printf("%02x", hash_ptr[i]);
+	}
+}
+
 static void print_buffer(char *buffer, size_t size) {
 	int i; int j;
 	for (j = 0; j < size; ) {
@@ -97,19 +105,15 @@ static void print_buffer(char *buffer, size_t size) {
 	}
 }
 
-static pcd_policy_simple_cred_t cred;
 static bool init;
 
 #define STATIC_DELEGATOR_ADDR "/tmp/UNIX0.domain"
 static pcd_delegator_addr_t delegator_addr = STATIC_DELEGATOR_ADDR;
 
-static pcd_policy_t *policy;
-static pcd_policy_simple_policy_t *simple_policy;
-static pcd_policy_simple_rule_t simple_rules[3] = {
-	{ static_original_type, PCD_POLICY_SIMPLE_ADMIN },
-	{ static_result_type, PCD_POLICY_SIMPLE_USER },
-	{ static_result_type, PCD_POLICY_SIMPLE_ADMIN }
-};
+static pcd_policy_t *policy = NULL;
+static pcd_demo_policy_rule_t demo_rules[3];
+
+pcd_identity_t owner_id;
 
 extern "C" int ecall_push_secret_to_remote() {
 	pcd_secret_t *secret;
@@ -125,31 +129,88 @@ extern "C" int ecall_push_secret_to_remote() {
 	memcpy(&secret->secret, &owner_encryption_key, sizeof(pcd_crypto_aes_gcm_key_t));
 
 	// send it to remtoe
-	status = pcd_register_secret_to_remote(&static_owner_id, STATIC_DELEGATOR_ADDR, secret);
+	status = pcd_register_secret_to_remote(&owner_id, STATIC_DELEGATOR_ADDR, secret);
 
 	return status;
 }
 
-extern "C" int ecall_produce_data(uint64_t a, uint64_t b, void *output_data, size_t *output_size, size_t max_size) {
+extern "C" void pcd_print_id(char *id);
+
+extern "C" int ecall_produce_data(uint64_t *numbers, uint64_t number_count, void *output_data, size_t *output_size, size_t max_size, uint8_t rule_mask) {
 	int status;
 	pcd_enc_data_t *enc_data;
 	size_t data_size;
-	user_data_t input_data;
+	user_data_t *input_data;
+	size_t input_data_size;
+	pcd_demo_attribute_t attributes;
 
-	input_data.type = USER_DATA_TYPE_ORIGINAL;
-	input_data.numbers[0] = a;
-	input_data.numbers[1] = b;
+	int rule_count = 0;
+	int i;
 
-	status =  pcd_producer_generate_data((void *)&input_data, sizeof(input_data), &static_original_type, 1, &enc_data);
+	// Input data
+	input_data_size = sizeof(user_data_t) + number_count * sizeof(uint64_t);
+	input_data = (user_data_t *)malloc(input_data_size);
+	if (input_data == NULL) {
+		printf("ERROR: Consumer Enclave: Failed to allocate policy\n");
+		return PCD_MEMERR;
+	}
+	printf("[+] number_count = %ld\n", number_count);
+	input_data->count = number_count;
+	for (i = 0; i < number_count; i++) {
+		input_data->numbers[i] = numbers[i];
+	printf("    [%d] = %ld\n", i, input_data->numbers[i]);
+	}
+
+
+	// Policy
+	for (i = 0; i < 3; i++) {
+		if ((rule_mask & (0x01 << i)) != 0) {
+			rule_count += 1;
+		}
+	}
+
+	policy = (pcd_policy_t *)malloc(sizeof(pcd_policy_t) + rule_count * sizeof(pcd_demo_policy_rule_t));
+	if (policy == NULL) {
+		printf("ERROR: Consumer Enclave: Failed to allocate policy\n");
+		free(input_data);
+		return PCD_MEMERR;
+	}
+	for (i = 0; i < 3; i++) {
+		if ((rule_mask & (0x01 << i)) != 0) {
+			memcpy((void *)(policy->policy_buffer + i * sizeof(pcd_demo_policy_rule_t)), 
+				(void *)&(demo_rules[i]), sizeof(pcd_demo_policy_rule_t));
+		}
+	}
+
+	memcpy((void *)&policy->type, (void *)&pcd_demo_policy_type, sizeof(pcd_policy_type_t));
+	policy->policy_size = rule_count * sizeof(pcd_demo_policy_rule_t);
+
+	// Attributes
+	memcpy((void *)&attributes.custodian_id, &owner_id, sizeof(pcd_identity_t));
+	attributes.number_of_entries = number_count;
+
+	// Generate data
+	status = pcd_generate_data((void *)input_data, input_data_size,
+				&owner_id,
+				&delegator_addr,
+				policy,
+				NULL, 0, // No tags
+				&attributes, sizeof(pcd_demo_attribute_t),
+				PCD_CRYPTO_AES_GCM,
+				&enc_data);
 	if (status != PCD_OK) {
-		printf("ERROR: Consumer Enclave: Failed to produce data with %d\n", status);
+		printf("ERROR: Producer Enclave: Failed to produce data with %d\n", status);
+		free(input_data);
+		free(policy);
 		return status;
 	}
 
 	data_size = sizeof(pcd_enc_data_t) + enc_data->enc_size;
 	if (data_size > max_size) {
-		printf("ERROR: Consumer Enclave: Failed to produce data due to size overflow\n");
+		printf("ERROR: Producer Enclave: Failed to produce data due to size overflow\n");
 		free(enc_data);
+		free(input_data);
+		free(policy);
 		return 1;
 	}
 
@@ -157,29 +218,47 @@ extern "C" int ecall_produce_data(uint64_t a, uint64_t b, void *output_data, siz
 	*output_size = data_size;
 
 	free(enc_data);
+	free(input_data);
+	free(policy);
+
 	return 0;
 }
 
-extern "C" void ecall_init_env() {
-	pcd_policy_init();
+pcd_secret_t *secret = NULL;
+
+extern "C" void ecall_change_owner_id(uint8_t *new_owner_id) {
+	memcpy((void *)&owner_id, (void *)new_owner_id, sizeof(pcd_identity_t));
+
+	// As a demo, we use the same secret for everyone...
+	pcd_secret_register(&owner_id, secret);
+	memcpy((void *)&demo_rules[2].custodian_info.custodian_id, (void *)&owner_id, sizeof(pcd_identity_t));
+}
+
+
+extern "C" void ecall_change_target_hash(uint8_t *target_program_hash) {
+	memcpy((void *)&demo_rules[0].program_hash, (void *)&target_program_hash, sizeof(pcd_sha256_t));
+}
+
+extern "C" void ecall_init_env(uint8_t *input_owner_id, uint8_t *target_program_hash) {
 	pcd_crypto_init();
 	set_enclave_trust_verifier(&verify_peer_trust);
 
-	simple_policy = (pcd_policy_simple_policy_t *)malloc(sizeof(pcd_policy_simple_policy_t) + sizeof(simple_rules));
-	memcpy((void *)&simple_policy->rules, (void *)&simple_rules, sizeof(simple_rules));
-	simple_policy->rule_count = 3;
-	printf("INFO: simple_policy size is %ld\n", sizeof(pcd_policy_simple_policy_t) + sizeof(simple_rules));
+	secret = (pcd_secret_t *)malloc(sizeof(pcd_secret_t) + sizeof(pcd_crypto_aes_gcm_key_t));
+	secret->secret_size = sizeof(pcd_crypto_aes_gcm_key_t);
+	memcpy(secret->secret, &owner_encryption_key, sizeof(pcd_crypto_aes_gcm_key_t));
 
-    print_buffer((char *)simple_policy, sizeof(pcd_policy_simple_policy_t) + sizeof(simple_rules));
+	memcpy((void *)&owner_id, (void *)input_owner_id, sizeof(pcd_identity_t));
 
-	policy = (pcd_policy_t *)malloc(sizeof(pcd_policy_t) + sizeof(pcd_policy_simple_policy_t) + sizeof(simple_rules));
-	memcpy((void *)&policy->policy_buffer, (void *)simple_policy, sizeof(pcd_policy_simple_policy_t) + sizeof(simple_rules));
-	policy->type = PCD_POLICY_SIMPLE;
-	policy->policy_size = sizeof(pcd_policy_simple_policy_t) + sizeof(simple_rules);
-	printf("INFO: policy size is %ld\n", sizeof(pcd_policy_t) + sizeof(pcd_policy_simple_policy_t) + sizeof(simple_rules));
+	pcd_secret_register(&owner_id, secret);
 
-	print_buffer((char *)policy, sizeof(pcd_policy_t) + policy->policy_size);
-
-	pcd_producer_init(&static_owner_id, policy, &delegator_addr,
-			 &owner_encryption_key, PCD_CRYPTO_AES_GCM);
+	demo_rules[0].rule_type = PCD_DEMO_POLICY_TYPE_PROGRAM_HASH;
+	memcpy((void *)&demo_rules[0].program_hash, (void *)target_program_hash, sizeof(pcd_sha256_t));
+	printf("[+] INFO: hash initied to be ");
+	pcd_policy_disc_print_hash((uint8_t *)&demo_rules[0].program_hash);
+	printf("\n");
+	demo_rules[1].rule_type = PCD_DEMO_POLICY_TYPE_ENTRY_CAP;
+	demo_rules[1].entry_cap_percentage = 70;
+	demo_rules[2].rule_type = PCD_DEMO_POLICY_TYPE_PROGRAM_HASH;
+	memcpy((void *)&demo_rules[2].custodian_info.custodian_id, (void *)&owner_id, sizeof(pcd_identity_t));
+	demo_rules[2].custodian_info.entry_amount = 2;
 }

@@ -13,8 +13,10 @@
 #define PCD_DENINED		0x0009
 #define PCD_REMOTE_FAILED	0x000A
 #define PCD_POLICY_NSUPPORT	0x000B
+#define PCD_RUNTIME_ERR		0x000C
 
 #define PCD_UNKNOWN		0x0100
+
 
 
 #endif

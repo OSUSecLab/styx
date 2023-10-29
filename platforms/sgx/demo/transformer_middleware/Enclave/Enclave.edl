@@ -1,0 +1,20 @@
+enclave {
+    include "sgx_eid.h"
+
+    include "sgx_trts.h"
+    include "sgx_report.h"
+
+	from "sgx_tstdc.edl" import sgx_thread_wait_untrusted_event_ocall, sgx_thread_set_untrusted_event_ocall;
+	from "sgx.edl" import *;
+
+    trusted{
+		public void ecall_init_env();
+        public int ecall_run_app([user_check] uint8_t *app_module_buffer, uint32_t app_module_size, [user_check] char *custodian_id, [user_check] char **dir_allow_list, uint32_t dir_allow_count, uint32_t stack_size, uint32_t heap_size, [user_check] uint32_t *argv, uint32_t argc);
+        public int ecall_load_disc([user_check] char *module_buffer, size_t module_size, [user_check] char *type);
+    };
+
+    untrusted{
+	
+    };
+
+};

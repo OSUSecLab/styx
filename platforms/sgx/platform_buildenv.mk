@@ -54,7 +54,7 @@ Crypto_Library_Name := sgx_tcrypto
 Include_Paths += -I$(SGX_SDK)/include -I$(SGX_SDK)/include/tlibc -I$(SGX_SDK)/include/libcxx
 
 
-PLATFORM_DIR := platforms/sgx
+PLATFORM_DIR := $(ROOT_DIR)/platforms/sgx
 
 Include_Paths += -I$(PLATFORM_DIR)/include
 
@@ -63,6 +63,7 @@ Untrusted_Include_Paths += -I$(PLATFORM_DIR)/untrusted/include -I$(SGX_SDK)/incl
 C_Files += $(PLATFORM_DIR)/log_backend.c
 
 Untrusted_C_Files += $(PLATFORM_DIR)/untrusted/log.c
+
 # Crypto configurations
 
 ifdef CONFIG_CRYPTO_AES_GCM
@@ -71,6 +72,8 @@ C_Flags += -DPCD_CONFIG_CRYPTO_AES_GCM
 C_Files += $(wildcard $(PLATFORM_DIR)/crypto/aes_gcm/*.c)
 endif
 endif
+
+C_Files += $(PLATFORM_DIR)/crypto/sha256.c
 
 # Modules
 
@@ -125,9 +128,7 @@ endif
 
 # Flags
 
-C_Flags += $(Include_Paths) -nostdinc -fvisibility=hidden -fpie -ffunction-sections -fdata-sections $(MITIGATION_CFLAGS)
-
-Untrusted_C_Flags += $(Untrusted_Include_Paths)
+C_Flags += -nostdinc -fvisibility=hidden -fpie -ffunction-sections -fdata-sections $(MITIGATION_CFLAGS)
 
 CC_BELOW_4_9 := $(shell expr "`$(CC) -dumpversion`" \< "4.9")
 ifeq ($(CC_BELOW_4_9), 1)
@@ -136,6 +137,3 @@ else
 C_Flags += -fstack-protector-strong
 endif
 
-Cpp_Flags += $(C_Flags) -nostdinc++
-
-Untrusted_Cpp_Flags += $(Untrusted_C_Flags)

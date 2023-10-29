@@ -6,10 +6,6 @@ enclave {
     include "sgx_trts.h"
     include "sgx_report.h"
 
-    from "sgx_tstdc.edl" import *;
-    from "sgx_pthread.edl" import *;
-    from "sgx_wamr.edl" import *;
-
     trusted{
 #ifdef xxx
 	public uint32_t ecall_session_request([out] pcd_dh_dcap_msg1_t *dh_msg1,

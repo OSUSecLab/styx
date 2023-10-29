@@ -25,15 +25,15 @@ extern "C" uint32_t ocall_ecdsa_get_qe_target_info(sgx_target_info_t* qe_target_
 	// out-of-proc mode, you need to install libsgx-quote-ex as well. This sample is built to demo both 2
 	// modes, so you need to install libsgx-quote-ex to enable the out-of-proc mode.
         // Following functions are valid in Linux in-proc mode only.
-        pcd_log("sgx_qe_set_enclave_load_policy is valid in in-proc mode only and it is optional: the default enclave load policy is persistent: \n");
-        pcd_log("set the enclave load policy as persistent:");
+        //pcd_log("sgx_qe_set_enclave_load_policy is valid in in-proc mode only and it is optional: the default enclave load policy is persistent: \n");
+        //pcd_log("set the enclave load policy as persistent:");
         qe3_ret = sgx_qe_set_enclave_load_policy(SGX_QL_PERSISTENT);
         if(SGX_QL_SUCCESS != qe3_ret) {
             pcd_log_error("Error in set enclave load policy: 0x%04x\n", qe3_ret);
             ret = -1;
             goto CLEANUP;
         }
-        pcd_log("succeed!\n");
+        //pcd_log("succeed!\n");
 
         // Try to load PCE and QE3 from Ubuntu-like OS system path
         if (SGX_QL_SUCCESS != sgx_ql_set_path(SGX_QL_PCE_PATH, "/usr/lib/x86_64-linux-gnu/libsgx_pce.signed.so") ||
@@ -57,14 +57,14 @@ extern "C" uint32_t ocall_ecdsa_get_qe_target_info(sgx_target_info_t* qe_target_
             }
         }
 
-    pcd_log("\nStep1: Call sgx_qe_get_target_info:");
+    //pcd_log("\nStep1: Call sgx_qe_get_target_info:");
     qe3_ret = sgx_qe_get_target_info(&qe3_target_info);
     if (SGX_QL_SUCCESS != qe3_ret) {
         pcd_log_error("Error in sgx_qe_get_target_info. 0x%04x\n", qe3_ret);
                 ret = -1;
         goto CLEANUP;
     }
-    pcd_log("succeed!");
+    //pcd_log("succeed!");
 
 	memcpy(qe_target_info, &qe3_target_info, sizeof(qe3_target_info));
 
@@ -86,18 +86,18 @@ extern "C" uint32_t ocall_ecdsa_quote_generation(uint32_t* quote_size, sgx_repor
     sgx_ql_auth_data_t *p_auth_data;
     sgx_ql_ecdsa_sig_data_t *p_sig_data;
     sgx_ql_certification_data_t *p_cert_data;
-    pcd_log("\nStep2: Call create_app_report:");
+    //pcd_log("\nStep2: Call create_app_report:");
     
 
-    pcd_log("succeed!");
-    pcd_log("\nStep3: Call sgx_qe_get_quote_size:");
+    //pcd_log("succeed!");
+    //pcd_log("\nStep3: Call sgx_qe_get_quote_size:");
     qe3_ret = sgx_qe_get_quote_size(quote_size);
     if (SGX_QL_SUCCESS != qe3_ret)
     {
         pcd_log_error("Error in sgx_qe_get_quote_size. 0x%04x\n", qe3_ret);
         goto CLEANUP;
     }
-	pcd_log("succeed!");
+	//pcd_log("succeed!");
     p_quote_buffer = (uint8_t *)malloc(*quote_size);
     if (NULL == p_quote_buffer)
     {
@@ -107,7 +107,7 @@ extern "C" uint32_t ocall_ecdsa_quote_generation(uint32_t* quote_size, sgx_repor
     memset(p_quote_buffer, 0, *quote_size);
 
     // Get the Quote
-    pcd_log("\nStep4: Call sgx_qe_get_quote:");
+    //pcd_log("\nStep4: Call sgx_qe_get_quote:");
     qe3_ret = sgx_qe_get_quote(app_report,
                                *quote_size,
                                p_quote_buffer);
@@ -116,7 +116,7 @@ extern "C" uint32_t ocall_ecdsa_quote_generation(uint32_t* quote_size, sgx_repor
         pcd_log_error("Error in sgx_qe_get_quote. 0x%04x\n", qe3_ret);
         goto CLEANUP;
     }
-    pcd_log("succeed!");
+    //pcd_log("succeed!");
 
 	memcpy(quote_buffer, p_quote_buffer, *quote_size);
     p_quote = (sgx_quote3_t *)p_quote_buffer;
@@ -124,7 +124,7 @@ extern "C" uint32_t ocall_ecdsa_quote_generation(uint32_t* quote_size, sgx_repor
     p_auth_data = (sgx_ql_auth_data_t *)p_sig_data->auth_certification_data;
     p_cert_data = (sgx_ql_certification_data_t *)((uint8_t *)p_auth_data + sizeof(*p_auth_data) + p_auth_data->size);
 
-    pcd_log("cert_key_type = 0x%x\n", p_cert_data->cert_key_type);
+    //pcd_log("cert_key_type = 0x%x\n", p_cert_data->cert_key_type);
 	
 	CLEANUP:
     if (NULL != p_quote_buffer) {
@@ -150,14 +150,14 @@ extern "C" uint32_t ocall_ecdsa_quote_verification(uint8_t* quote_buffer, uint32
     sgx_ql_qv_result_t quote_verification_result = SGX_QL_QV_RESULT_UNSPECIFIED;
     uint32_t collateral_expiration_status = 1;
 
-    pcd_log("size of quote will be verified : %ld\n", quote_size);
+    //pcd_log("size of quote will be verified : %ld\n", quote_size);
     // Untrusted quote verification
     // call DCAP quote verify library to get supplemental data size
     //
     dcap_ret = sgx_qv_get_quote_supplemental_data_size(&supplemental_data_size);
     if (dcap_ret == SGX_QL_SUCCESS && supplemental_data_size == sizeof(sgx_ql_qv_supplemental_t))
     {
-        pcd_log("\tInfo: sgx_qv_get_quote_supplemental_data_size successfully returned.\n");
+        //pcd_log("\tInfo: sgx_qv_get_quote_supplemental_data_size successfully returned.\n");
         p_supplemental_data = (uint8_t *)malloc(supplemental_data_size);
     }
     else
@@ -190,7 +190,7 @@ extern "C" uint32_t ocall_ecdsa_quote_verification(uint8_t* quote_buffer, uint32
         p_supplemental_data);
     if (dcap_ret == SGX_QL_SUCCESS)
     {
-        pcd_log("\tInfo: App: sgx_qv_verify_quote successfully returned.\n");
+        //pcd_log("\tInfo: App: sgx_qv_verify_quote successfully returned.\n");
     }
     else
     {
@@ -207,7 +207,7 @@ extern "C" uint32_t ocall_ecdsa_quote_verification(uint8_t* quote_buffer, uint32
         //
         if (collateral_expiration_status == 0)
         {
-            pcd_log("\tInfo: App: Verification completed successfully.\n");
+            //pcd_log("\tInfo: App: Verification completed successfully.\n");
             ret = 0;
         }
         else
@@ -242,7 +242,7 @@ extern "C" uint32_t ocall_ecdsa_quote_verification(uint8_t* quote_buffer, uint32
         // you can check supplemental data based on your own attestation/verification policy
         // here we only print supplemental data version for demo usage
         //
-        pcd_log("\tInfo: Supplemental data version: %d\n", p->version);
+       //pcd_log("\tInfo: Supplemental data version: %d\n", p->version);
     }
 
     return ret;
