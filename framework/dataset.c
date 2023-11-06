@@ -137,7 +137,6 @@ pcd_runtime_pointer_t pcd_dataset_access(uint32_t dataset_index, uint32_t data_i
 
 	payload = pcd_datasets[dataset_index]->payload_pointers[data_index];
 	data_size = sizeof(pcd_payload_t) + payload->data_size + payload->policy_size + payload->tag_size + payload->attribute_size;
-	printf("DEBUG: data_size = %d\n", data_size);
 	ret = pcd_runtime_copy_data_into_runtime(app_instance, (void *)payload, data_size);
 	payload_test = (uint8_t *)pcd_runtime_app_to_native(app_instance, ret);
 	return ret;

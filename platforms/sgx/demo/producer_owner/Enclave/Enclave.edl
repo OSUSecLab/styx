@@ -41,7 +41,8 @@ enclave {
     trusted{
 	    public int ecall_push_secret_to_remote();
         public int ecall_produce_data([user_check] uint64_t *numbers, uint64_t number_count, [user_check] void *output_data, [out] size_t *output_size, size_t max_size, uint8_t rule_mask);
-		public void ecall_init_env([user_check] uint8_t *input_owner_id, [user_check] uint8_t *target_program_hash);
+		public int ecall_pack_data([user_check] void *input_data, size_t input_data_size, [user_check] void *output_data, [out] size_t *output_size, size_t max_size, uint8_t rule_mask);
+        public void ecall_init_env([user_check] uint8_t *input_owner_id, [user_check] uint8_t *target_program_hash);
         public void ecall_change_target_hash([user_check] uint8_t *target_program_hash);
         public void ecall_change_owner_id([user_check] uint8_t *new_owner_id);
     };

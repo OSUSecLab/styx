@@ -241,6 +241,8 @@ int main(int argc, char *argv[])
     size_t data_size;
     uint64_t number_count;
     uint64_t *input_buffer;
+    void *input_file_buffer;
+    size_t input_size;
     int i;
     uint8_t rule_mask;
 
@@ -312,6 +314,7 @@ int main(int argc, char *argv[])
             printf("o <uuid path>:                                  load new owner uuid\n");
             printf("h <hash path>:                                  load new target program hash\n");
             printf("g <num count> <nums> <rule mask> <output path>: generate data\n");
+            printf("a <input path> <rule mask> <output path>:       pack data\n");
             printf("p:                                              push secret to remote\n");
             printf("q:                                              quit\n");
             break;
@@ -369,6 +372,52 @@ int main(int argc, char *argv[])
             printf("INFO: ecall_produce_data returned %d\n", ret);
             if (ret != 0) {
                 printf("ERROR: ecall_produce_data failed to produce data\n");
+                if_continue = false;
+                continue;
+            }
+
+            // Open file
+            fp = fopen(cmdbuffer, "w+");
+            if (fp == NULL) {
+                printf("Error: Failed to open file %s\n", cmdbuffer);
+                continue;
+            }
+            fwrite(output_data, data_size, 1, fp);
+            fclose(fp);
+            
+            break;
+        case 'a':
+            scanf("%s", cmdbuffer);
+            input_file_buffer = (void *)read_file_to_buffer(cmdbuffer, &input_size);
+            scanf("%hhd %s", &rule_mask, cmdbuffer);
+
+            if (input_file_buffer == NULL) {
+                printf("ERROR: Failed to read file/create file buffer\n");
+                continue;
+            }
+
+            // Rebuild the output buffer
+            free(output_data);
+            output_data = (char *)malloc(input_size + 8196);
+            if (output_data == NULL) {
+                printf("ERROR: Failed to reallocate output buffer\n");
+                if_continue = false;
+                free(input_file_buffer);
+                continue;
+            }
+            printf("INFO: output_data's max size is set to %d\n", input_size + 8196);
+
+            // Produce
+            if ((status = ecall_pack_data(g_consumer_enclave_id, (int *)&ret, input_file_buffer, input_size, output_data, &data_size, input_size + 8196, rule_mask)) != SGX_SUCCESS) {
+				printf("ERROR: ecall_pack_data failed with %d\n", status);
+                if_continue = false;
+                free(input_file_buffer);
+                continue;
+			}
+            free(input_file_buffer);
+            printf("INFO: ecall_pack_data returned %d\n", ret);
+            if (ret != 0) {
+                printf("ERROR: ecall_pack_data failed to produce data\n");
                 if_continue = false;
                 continue;
             }

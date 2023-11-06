@@ -224,6 +224,81 @@ extern "C" int ecall_produce_data(uint64_t *numbers, uint64_t number_count, void
 	return 0;
 }
 
+extern "C" int ecall_pack_data(void *input_data, size_t input_data_size, void *output_data, size_t *output_size, size_t max_size, uint8_t rule_mask) {
+	int status;
+	pcd_enc_data_t *enc_data;
+	size_t data_size;
+	pcd_demo_attribute_t attributes;
+
+	int rule_count = 0;
+	int i;
+
+	// Policy
+	for (i = 0; i < 3; i++) {
+		if ((rule_mask & (0x01 << i)) != 0) {
+			rule_count += 1;
+		}
+	}
+
+	policy = (pcd_policy_t *)malloc(sizeof(pcd_policy_t) + rule_count * sizeof(pcd_demo_policy_rule_t));
+	if (policy == NULL) {
+		printf("ERROR: Consumer Enclave: Failed to allocate policy\n");
+		free(input_data);
+		return PCD_MEMERR;
+	}
+	for (i = 0; i < 3; i++) {
+		if ((rule_mask & (0x01 << i)) != 0) {
+			memcpy((void *)(policy->policy_buffer + i * sizeof(pcd_demo_policy_rule_t)), 
+				(void *)&(demo_rules[i]), sizeof(pcd_demo_policy_rule_t));
+		}
+	}
+
+	memcpy((void *)&policy->type, (void *)&pcd_demo_policy_type, sizeof(pcd_policy_type_t));
+	policy->policy_size = rule_count * sizeof(pcd_demo_policy_rule_t);
+
+	// Attributes
+	// Using the same DISC. Don't bother the number of entries.
+	memcpy((void *)&attributes.custodian_id, &owner_id, sizeof(pcd_identity_t));
+	attributes.number_of_entries = 0;
+
+
+	printf("INFO: input_data_size = %d\n", input_data_size);
+	// Generate data
+	status = pcd_generate_data((void *)input_data, input_data_size,
+				&owner_id,
+				&delegator_addr,
+				policy,
+				NULL, 0, // No tags
+				&attributes, sizeof(pcd_demo_attribute_t),
+				PCD_CRYPTO_AES_GCM,
+				&enc_data);
+	if (status != PCD_OK) {
+		printf("ERROR: Producer Enclave: Failed to produce data with %d\n", status);
+		//free(input_data);
+		free(policy);
+		return status;
+	}
+
+	data_size = sizeof(pcd_enc_data_t) + enc_data->enc_size;
+	if (data_size > max_size) {
+		printf("ERROR: Producer Enclave: Failed to produce data due to size overflow\n");
+		free(enc_data);
+		//free(input_data);
+		free(policy);
+		return 1;
+	}
+
+	memcpy(output_data, enc_data, data_size);
+	*output_size = data_size;
+
+	free(enc_data);
+	//free(input_data);
+	free(policy);
+
+	return 0;
+}
+
+
 pcd_secret_t *secret = NULL;
 
 extern "C" void ecall_change_owner_id(uint8_t *new_owner_id) {

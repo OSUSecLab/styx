@@ -76,7 +76,7 @@ endif ()
 
 if (NOT DEFINED WAMR_BUILD_LIB_PTHREAD)
   # Enable pthread library by default
-  set (WAMR_BUILD_LIB_PTHREAD 1)
+  set (WAMR_BUILD_LIB_PTHREAD 0)
 endif ()
 
 if (NOT DEFINED WAMR_BUILD_SIMD)

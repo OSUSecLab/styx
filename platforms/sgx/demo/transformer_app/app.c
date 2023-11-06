@@ -47,7 +47,7 @@ void process_data_and_output(uint32_t dataset_index, uint32_t data_count) {
 		user_data = (user_data_t *)payload->payload;
 		printf("[+] WASM App: DEBUG: Data %d has %d%d numbers\n", i, user_data->count);
 		if (payload->data_size != (user_data->count * sizeof(uint64_t) + sizeof(user_data_t))) {
-			printf("[-] size mismatch!\n");
+			printf("[-]  size mismatch!\n");
 		}
 		else {
 			for (j = 0; j < user_data->count; j++) {

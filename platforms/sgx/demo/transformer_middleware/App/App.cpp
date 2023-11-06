@@ -228,7 +228,7 @@ char targetbuffer[100];
 char outbuffer[100];
 
 #define PCD_APP_STACK_SIZE (4 * 1024 * 1024)
-#define PCD_APP_HEAP_SIZE (16 * 1024 * 1024)
+#define PCD_APP_HEAP_SIZE (100 * 1024 * 1024)
 
 
 char path_buffer[100];
