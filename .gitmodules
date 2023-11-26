@@ -4,3 +4,7 @@
 [submodule "platforms/sgx/demo/libonnx-pcd"]
 	path = platforms/sgx/demo/libonnx-pcd
 	url = https://github.com/NSKernel/libonnx-pcd
+[submodule "platforms/sgx/demo/libonnx-native"]
+	path = platforms/sgx/demo/libonnx-native
+	url = https://github.com/NSKernel/libonnx-pcd
+	branch = native
