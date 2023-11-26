@@ -8,6 +8,8 @@ SGX_MODE ?= HW
 SGX_ARCH ?= x64
 SGX_DEBUG ?= 1
 
+PCD_DEMO_USE_NATIVE_LIBONNX := y
+
 ifeq ($(shell getconf LONG_BIT), 32)
 	SGX_ARCH := x86
 else ifeq ($(findstring -m32, $(CXXFLAGS)), -m32)
@@ -204,9 +206,31 @@ libtpcd.a: $(PCD_ROOT)/libtpcd.a
 	@cp $< $@
 	@echo "CP $@  <=  $<"
 
-$(Enclave_Name): $(Enclave_Cpp_Objects) libtpcd.a Enclave/Enclave_t.o 
-	$(CXX) $^ -o $@ $(Enclave_Link_Flags)
+ifdef PCD_DEMO_USE_NATIVE_LIBONNX
+ifeq ($(PCD_DEMO_USE_NATIVE_LIBONNX), y)
+../libonnx-native/src/libonnx.a: 
+	@echo "MAKE $@"
+	@make -c ../libonnx-native/src/
+
+libonnx.a: ../libonnx-native/src/libonnx.a
+	@cp $< $@
+	@echo "CP $@  <=  $<"
+$(Enclave_Name): $(Enclave_Cpp_Objects) libtpcd.a libonnx.a Enclave/Enclave_t.o
+	@$(CXX) $^ -o $@ $(Enclave_Link_Flags)
+	@echo "Building with native libonnx"
 	@echo "LINK =>  $@"
+else
+$(Enclave_Name): $(Enclave_Cpp_Objects) libtpcd.a Enclave/Enclave_t.o
+	@$(CXX) $^ -o $@ $(Enclave_Link_Flags)
+	@echo "Building without native libonnx"
+	@echo "LINK =>  $@"
+endif
+else
+$(Enclave_Name): $(Enclave_Cpp_Objects) libtpcd.a Enclave/Enclave_t.o
+	@$(CXX) $^ -o $@ $(Enclave_Link_Flags)
+	@echo "Building without native libonnx"
+	@echo "LINK =>  $@"
+endif
 
 $(Signed_Enclave_Name): $(Enclave_Name)
 	@$(SGX_ENCLAVE_SIGNER) sign -key Enclave/Enclave_private_test.pem -enclave $(Enclave_Name) -out $@ -config $(Enclave_Config_File)
@@ -215,4 +239,4 @@ $(Signed_Enclave_Name): $(Enclave_Name)
 .PHONY: clean
 
 clean:
-	@rm -f $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name) $(App_Cpp_Objects) App/Enclave_u.* $(Enclave_Cpp_Objects) Enclave/Enclave_t.* libtpcd.a libupcd.a
+	@rm -f $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name) $(App_Cpp_Objects) App/Enclave_u.* $(Enclave_Cpp_Objects) Enclave/Enclave_t.* libtpcd.a libupcd.a libonnx.a

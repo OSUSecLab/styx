@@ -2,8 +2,15 @@
   <ProdID>0</ProdID> 
   <ISVSVN>0</ISVSVN> 
   <StackMaxSize>0x400000</StackMaxSize> 
+  <HeapMinSize>0x19000000</HeapMinSize>
+  <HeapInitSize>0x19000000</HeapInitSize>
   <HeapMaxSize>0x19000000</HeapMaxSize> 
+  <ReservedMemInitSize>0x19000000</ReservedMemInitSize>
+  <ReservedMemMaxSize>0x19000000</ReservedMemMaxSize>
+  <ReservedMemExecutable>1</ReservedMemExecutable>
   <TCSNum>1</TCSNum> 
   <TCSPolicy>1</TCSPolicy> 
-  <DisableDebug>0</DisableDebug> 
+  <DisableDebug>0</DisableDebug>
+  <MiscSelect>0</MiscSelect>
+  <MiscMask>0</MiscMask>
 </EnclaveConfiguration>

@@ -227,8 +227,8 @@ char cmdbuffer[100];
 char targetbuffer[100];
 char outbuffer[100];
 
-#define PCD_APP_STACK_SIZE (4 * 1024 * 1024)
-#define PCD_APP_HEAP_SIZE (100 * 1024 * 1024)
+#define PCD_APP_STACK_SIZE (20 * 1024 * 1024)
+#define PCD_APP_HEAP_SIZE (200 * 1024 * 1024)
 
 
 char path_buffer[100];
@@ -249,7 +249,7 @@ int main(int argc, char *argv[])
 
 
     char allow_dir[] = "/home/nskernel/pcd/platforms/sgx/demo/";
-    char allow_dir_2[] = "/home/nskernel/pcd/platforms/sgx/demo/transformer_middleware/";
+    char allow_dir_2[] = "/home/nskernel/nbench-wasm/";
     char *static_allow_list[2] = { allow_dir,  allow_dir_2};
 
     printf("Allow %s\n", static_allow_list[0]);

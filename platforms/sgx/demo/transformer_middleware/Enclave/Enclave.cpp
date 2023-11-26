@@ -142,8 +142,78 @@ extern "C" int ecall_load_disc(char *module_buffer, size_t module_size, char *ty
 	return ret;
 }
 
+
+
+#ifdef PCD_DEMO_USE_NATIVE_LIBONNX
+extern "C" {
+uint32_t pcd_wamr_register_native_symbol(const char *name, void *ptr, const char *signature);
+int onnx_get_graph_nlen(void * ctx);
+pcd_runtime_pointer_t onnx_benchmark_get_name(void * ctx, int i);
+void onnx_run_single_node(void * ctx, int i);
+pcd_runtime_pointer_t onnx_context_alloc(const void * buf, size_t len, void ** r, int rlen);
+void onnx_context_free(void * ctx);
+
+int onnx_get_graph_nlen_wrapper(wasm_exec_env_t exec_env, void *ctx) {
+	return onnx_get_graph_nlen(ctx);
+}
+
+pcd_runtime_pointer_t onnx_benchmark_get_name_wrapper(wasm_exec_env_t exec_env, void * ctx, int i) {
+	return onnx_benchmark_get_name(ctx, i);
+}
+
+void onnx_run_single_node_wrapper(wasm_exec_env_t exec_env, void * ctx, int i) {
+	onnx_run_single_node(ctx, i);
+}
+
+pcd_runtime_pointer_t onnx_context_alloc_wrapper(wasm_exec_env_t exec_env, const void * buf, size_t len, void ** r, int rlen) {
+	return onnx_context_alloc(buf, len, r, rlen);
+}
+
+void onnx_context_free_wrapper(wasm_exec_env_t exec_env, void * ctx) {
+	onnx_context_free(ctx);
+}
+
+
+static struct native_symbol {
+	const char *name;
+	void *ptr;
+	const char *signature;
+} pcd_dataset_native_symbols[] = 
+{
+    { "onnx_get_graph_nlen", 		(void*)onnx_get_graph_nlen_wrapper,	"(*)i" },
+    { "onnx_benchmark_get_name", 	(void*)onnx_benchmark_get_name_wrapper, "(*i)i" },
+    { "onnx_run_single_node", 		(void*)onnx_run_single_node_wrapper, 	"(*i)" },
+    { "onnx_context_alloc", 		(void*)onnx_context_alloc_wrapper, 	"(*i*i)i" },
+    { "onnx_context_free", 		(void*)onnx_context_free_wrapper, 	"(*)" }
+};
+}
+
+int register_native_symbols() {
+	// 5 APIs needed to run benchmark
+	int i;
+	int ret = 0;
+
+	for (i = 0; i < 5; i++) {
+		if ((ret = pcd_wamr_register_native_symbol(
+			pcd_dataset_native_symbols[i].name,
+			pcd_dataset_native_symbols[i].ptr,
+			pcd_dataset_native_symbols[i].signature
+		))) {
+			printf("Error: Failed to register native symbol %s", pcd_dataset_native_symbols[i].name);
+			return ret;
+		}
+	}
+	return 0;
+}
+
+#endif
+
 extern "C" void ecall_init_env() {
 	pcd_runtime_setup_environment();
+	// Add library symbols
+#ifdef PCD_DEMO_USE_NATIVE_LIBONNX
+	register_native_symbols();
+#endif
 	pcd_crypto_init();
 	set_enclave_trust_verifier(&verify_peer_trust);
 

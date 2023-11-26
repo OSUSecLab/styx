@@ -1,0 +1,6 @@
+*.o
+enclave.so
+enclave.signed.so
+delegator
+Enclave/Enclave_t*
+App/Enclave_u*
