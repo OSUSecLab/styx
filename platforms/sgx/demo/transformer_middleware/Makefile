@@ -107,7 +107,7 @@ Enclave_Include_Paths := -IEnclave -I$(PCD_ROOT)/include \
                          -I$(SGX_SDK)/include/stlport \
 						 -I$(SGX_SDK)/include/libcxx
 
-Enclave_C_Flags := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fstack-protector $(Enclave_Include_Paths) -DPCD_CONFIG_ROLE_CHALLENGER -DPCD_CONFIG_RUNTIME_WAMR
+Enclave_C_Flags := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fstack-protector $(Enclave_Include_Paths) -DPCD_CONFIG_ROLE_CHALLENGER -DPCD_CONFIG_RUNTIME_WAMR -DPCD_DEMO_USE_NATIVE_LIBONNX
 Enclave_Cpp_Flags := $(Enclave_C_Flags) -std=c++03 -nostdinc++
 
 Enclave_Security_Link_Flags := -Wl,-z,relro,-z,now,-z,noexecstack
@@ -210,7 +210,7 @@ ifdef PCD_DEMO_USE_NATIVE_LIBONNX
 ifeq ($(PCD_DEMO_USE_NATIVE_LIBONNX), y)
 ../libonnx-native/src/libonnx.a: 
 	@echo "MAKE $@"
-	@make -c ../libonnx-native/src/
+	@make -C ../libonnx-native/src/
 
 libonnx.a: ../libonnx-native/src/libonnx.a
 	@cp $< $@
