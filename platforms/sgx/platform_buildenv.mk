@@ -126,6 +126,12 @@ Untrusted_Cpp_Files += $(wildcard $(PLATFORM_DIR)/untrusted/attestation/*.cpp)
 endif
 endif
 
+ifdef CONFIG_RUNTIME_WAMR
+ifeq ($(CONFIG_RUNTIME_WAMR), y)
+Untrusted_C_Files += $(PLATFORM_DIR)/untrusted/read_file_outside.c
+endif
+endif
+
 # Flags
 
 C_Flags += -nostdinc -fvisibility=hidden -fpie -ffunction-sections -fdata-sections $(MITIGATION_CFLAGS)

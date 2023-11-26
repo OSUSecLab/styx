@@ -108,8 +108,12 @@ static NativeSymbol pcd_policy_engine_native_symbols[] =
 
 extern pcd_instance_t *pcd_app_get_instance(void);
 
+extern int ocall_read_file_to_outside_buf(char **ret_buffer, int file, size_t file_size, size_t *read_size);
+extern int ocall_free_outside_buffer(char *outside_buffer);
+
 uint32_t pcd_read_file_to_buffer(wasm_exec_env_t exec_env, const char *filename, size_t *ret_size) {
     char *buffer;
+    char *outside_buffer;
     int file;
     size_t file_size, buf_size, read_size;
     struct stat stat_buf;
@@ -120,7 +124,7 @@ uint32_t pcd_read_file_to_buffer(wasm_exec_env_t exec_env, const char *filename,
         pcd_log_error("ERROR: Read file to buffer failed: invalid filename or ret size.\n");
         return 0;
     }
-    
+
     ocall_open(&file, filename, O_RDONLY, false, 0);
     if (file < 0) {
         pcd_log_error("ERROR: Read file to buffer failed: open file %s failed.\n", filename);
@@ -136,7 +140,6 @@ uint32_t pcd_read_file_to_buffer(wasm_exec_env_t exec_env, const char *filename,
     file_size = stat_buf.st_size;
 
     buf_size = file_size > 0 ? file_size : 1;
-    pcd_log("INFO: buf_size = %d\n", buf_size);
 
     ret_ptr = wasm_runtime_module_malloc(get_module_inst(exec_env), buf_size, (void **)&buffer);
     if (ret_ptr == 0) {
@@ -145,10 +148,17 @@ uint32_t pcd_read_file_to_buffer(wasm_exec_env_t exec_env, const char *filename,
         return 0;
     }
     
-    pcd_log("INFO: buffer = 0x%016llX, app_ptr = 0x%08X\n", (uint64_t)buffer, ret_ptr);
-    pcd_log("INFO: buffer from app_ptr = 0x%016llX\n", wasm_runtime_addr_app_to_native((wasm_module_inst_t)pcd_app_get_instance(), ret_ptr));
+     //ocall_read(&read_size, file, buffer, file_size);
+    ocall_read_file_to_outside_buffer(&outside_buffer, file, file_size, &read_size);
+    if (outside_buffer == NULL) {
+	pcd_log_error("ERROR: Failed to read to outside buffer\n");
+	ocall_close(&ret, file);
+	return 0;
+    }
 
-    ocall_read(&read_size, file, buffer, file_size);
+    memcpy(buffer, outside_buffer, read_size);
+    
+    ocall_free_outside_buffer(outside_buffer);
 
     ocall_close(&ret, file);
 
