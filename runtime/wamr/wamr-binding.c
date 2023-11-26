@@ -105,66 +105,8 @@ static NativeSymbol pcd_policy_engine_native_symbols[] =
 #endif
 
 #include <stddef.h>
-/*
-typedef long int time_t;
 
-typedef int clockid_t;
-
-struct timespec {
-    time_t tv_sec;
-    long tv_nsec;
-};
-
-typedef long __syscall_slong_t;
-
-typedef unsigned long dev_t;
-typedef unsigned long ino_t;
-typedef unsigned mode_t;
-typedef unsigned long nlink_t;
-typedef unsigned socklen_t;
-typedef long blksize_t;
-typedef long blkcnt_t;
-
-typedef int pid_t;
-typedef unsigned gid_t;
-typedef unsigned uid_t;
-
-typedef unsigned long nfds_t;
-
-typedef uintptr_t DIR;
-
-struct stat {
-    dev_t st_dev;
-    ino_t st_ino;
-    nlink_t st_nlink;
-
-    mode_t st_mode;
-    uid_t st_uid;
-    gid_t st_gid;
-    unsigned int __pad0;
-    dev_t st_rdev;
-    size_t st_size;
-    blksize_t st_blksize;
-    blkcnt_t st_blocks;
-
-    struct timespec st_atim;
-    struct timespec st_mtim;
-    struct timespec st_ctim;
-    long __unused[3];
-};
-
-#define O_RDONLY 00
-
-int
-ocall_open(int *p_fd, const char *pathname, int flags, bool has_mode,
-           unsigned mode);
-int
-ocall_read(size_t *p_ret, int fd, void *buf, size_t read_size);
-int
-ocall_fstat(int *p_ret, int fd, void *buf, unsigned int buf_len);
-int
-ocall_close(int *p_ret, int fd);*/
-
+extern pcd_instance_t *pcd_app_get_instance(void);
 
 uint32_t pcd_read_file_to_buffer(wasm_exec_env_t exec_env, const char *filename, size_t *ret_size) {
     char *buffer;
@@ -203,6 +145,8 @@ uint32_t pcd_read_file_to_buffer(wasm_exec_env_t exec_env, const char *filename,
         return 0;
     }
     
+    pcd_log("INFO: buffer = 0x%016llX, app_ptr = 0x%08X\n", (uint64_t)buffer, ret_ptr);
+    pcd_log("INFO: buffer from app_ptr = 0x%016llX\n", wasm_runtime_addr_app_to_native((wasm_module_inst_t)pcd_app_get_instance(), ret_ptr));
 
     ocall_read(&read_size, file, buffer, file_size);
 
@@ -280,6 +224,19 @@ uint32_t pcd_runtime_setup_environment() {
 fail:
 	wasm_runtime_destroy();
 	return PCD_RUNTIME_ERR;
+}
+
+uint32_t pcd_wamr_register_native_symbol(const char *name, void *ptr, const char *signature) {
+	NativeSymbol *symbol = malloc(sizeof(NativeSymbol));
+
+	symbol->symbol = name;
+	symbol->func_ptr = ptr;
+	symbol->signature = signature;
+	if (!wasm_runtime_register_natives("env", symbol, 1)) {
+		pcd_log_error("ERROR: pcd_wamr_register_native_symbol: Failed to register native symbol %s\n", name);
+		return PCD_RUNTIME_ERR;
+	}
+	return PCD_OK;
 }
 
 pcd_module_t *pcd_runtime_load_module(uint8_t *module_buffer, uint32_t module_size) {
@@ -378,6 +335,10 @@ pcd_runtime_pointer_t pcd_runtime_copy_data_into_runtime(pcd_instance_t *instanc
 
 void *pcd_runtime_app_to_native(pcd_instance_t *instance, pcd_runtime_pointer_t app_addr) {
 	return wasm_runtime_addr_app_to_native((wasm_module_inst_t)instance, (uint32_t)app_addr);
+}
+
+pcd_runtime_pointer_t pcd_runtime_native_to_app(pcd_instance_t *instance, void *native_addr) {
+	return (pcd_runtime_pointer_t)wasm_runtime_addr_native_to_app((wasm_module_inst_t)instance, native_addr);
 }
 
 void pcd_runtime_free(pcd_instance_t *instance, pcd_runtime_pointer_t app_addr) {
