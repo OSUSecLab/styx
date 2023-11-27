@@ -1,0 +1,7 @@
+nbench
+nbench.aot
+wamrc*
+*.o
+sysinfo.c
+sysinfoc.c
+hardware

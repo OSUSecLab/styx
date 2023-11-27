@@ -248,8 +248,8 @@ int main(int argc, char *argv[])
     uint32_t app_argv[2] = {0, 0};
 
 
-    char allow_dir[] = "/home/nskernel/pcd/platforms/sgx/demo/";
-    char allow_dir_2[] = "/home/nskernel/nbench-wasm/";
+    char allow_dir[] = "../";
+    char allow_dir_2[] = "../nbench";
     char *static_allow_list[2] = { allow_dir,  allow_dir_2};
 
     printf("Allow %s\n", static_allow_list[0]);
