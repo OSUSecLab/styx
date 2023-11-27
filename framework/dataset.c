@@ -13,11 +13,18 @@
 
 #include "policy/policy.h"
 
+#include "stopwatch.h"
+
 static char pcd_dataset_occupied[PCD_MAX_AMOUNT_DATASET] = { 0 };
 static pcd_dataset_t *pcd_datasets[PCD_MAX_AMOUNT_DATASET] = { NULL };
 
 uint32_t pcd_dataset_new(uint32_t dataset_max_size) {
 	int i;
+
+	PCD_EVAL_DEFINE_WATCH(watch);
+
+	pcd_eval_stopwatch_start(&watch);
+
 	for (i = 0; i < PCD_MAX_AMOUNT_DATASET; i++) {
 		if (pcd_dataset_occupied[i] == 0) {
 			pcd_dataset_occupied[i] = 1;
@@ -35,6 +42,8 @@ uint32_t pcd_dataset_new(uint32_t dataset_max_size) {
 		}
 	}
 
+	pcd_eval_stopwatch_lap("New dataset", &watch, 1);
+
 	return -PCD_OUT_OF_RANGE;
 }
 
@@ -45,11 +54,16 @@ uint32_t pcd_dataset_add_data(uint32_t dataset_index, pcd_enc_data_t *input_data
 	pcd_secret_t *secret = NULL;
 	int status;
 
+	PCD_EVAL_DEFINE_WATCH(watch);
+
 	// Check if dataset has an empty slot
 	if (pcd_datasets[dataset_index]->data_max_count == pcd_datasets[dataset_index]->data_count) {
 		pcd_log_error("ERROR: The dataset is full. Currently used %d/%d\n", pcd_datasets[dataset_index]->data_count, pcd_datasets[dataset_index]->data_max_count);
 		return PCD_OUT_OF_RANGE;
 	}
+
+
+	pcd_eval_stopwatch_start(&watch);
 
 	// Fetch the key
 	status = pcd_secret_fetch(&input_data->owner_id, &input_data->delegator_addr, &secret);
@@ -58,6 +72,8 @@ uint32_t pcd_dataset_add_data(uint32_t dataset_index, pcd_enc_data_t *input_data
 		return status;
 	}
 	pcd_log("INFO: pcd_dataset_add_data: fetched secret\n");
+
+	pcd_eval_stopwatch_lap("pcd_dataset_add_data: Fecth secret", &watch, 1);
 
 	// Decrypt
 	status = pcd_data_unpacker_decrypt_payload(input_data->encrypted_payload, input_data->enc_size,
@@ -69,6 +85,8 @@ uint32_t pcd_dataset_add_data(uint32_t dataset_index, pcd_enc_data_t *input_data
 		pcd_secret_release(&input_data->owner_id);
 		return status;
 	}
+
+	pcd_eval_stopwatch_lap("pcd_dataset_add_data: Decrypt", &watch, 1);
 
 	pcd_secret_release(&input_data->owner_id);
 
@@ -93,11 +111,13 @@ uint32_t pcd_dataset_add_data(uint32_t dataset_index, pcd_enc_data_t *input_data
 	pcd_datasets[dataset_index]->payload_pointers[pcd_datasets[dataset_index]->data_count] = plain_payload;
 	pcd_datasets[dataset_index]->data_count++;
 
+	pcd_eval_stopwatch_lap("pcd_dataset_add_data: Post processing", &watch, 1);
+
 	return PCD_OK;
 }
 
 uint32_t pcd_dataset_check_policy(uint32_t dataset_index, pcd_identity_t *program_owner_id) {
-	pcd_log("DEBUG: Entering pcd_dataset_check_policy. dataset_index = %d\n", dataset_index);
+	//pcd_log("DEBUG: Entering pcd_dataset_check_policy. dataset_index = %d\n", dataset_index);
 	if (pcd_dataset_occupied[dataset_index] == 0) {
 		pcd_log_error("ERROR: Dataset %d is not in use\n", dataset_index);
 		return PCD_NOT_FOUND;
@@ -111,8 +131,12 @@ pcd_runtime_pointer_t pcd_dataset_access(uint32_t dataset_index, uint32_t data_i
 	uint32_t data_size;
 	pcd_payload_t *payload;
 	pcd_runtime_pointer_t ret;
-	uint8_t *payload_test;
+	//uint8_t *payload_test;
 	int j, k;
+
+	PCD_EVAL_DEFINE_WATCH(watch);
+
+	pcd_eval_stopwatch_start(&watch);
 
 	if (pcd_dataset_occupied[dataset_index] == 0) {
 		pcd_log_error("ERROR: pcd_dataset_access: Dataset %d is not in use\n", dataset_index);
@@ -135,10 +159,15 @@ pcd_runtime_pointer_t pcd_dataset_access(uint32_t dataset_index, uint32_t data_i
 		return PCD_UNKNOWN;
 	}
 
+	pcd_eval_stopwatch_lap("pcd_dataset_access: Preparation", &watch, 1);
+
 	payload = pcd_datasets[dataset_index]->payload_pointers[data_index];
 	data_size = sizeof(pcd_payload_t) + payload->data_size + payload->policy_size + payload->tag_size + payload->attribute_size;
 	ret = pcd_runtime_copy_data_into_runtime(app_instance, (void *)payload, data_size);
-	payload_test = (uint8_t *)pcd_runtime_app_to_native(app_instance, ret);
+	//payload_test = (uint8_t *)pcd_runtime_app_to_native(app_instance, ret);
+
+	pcd_eval_stopwatch_lap("pcd_dataset_access: Done copying", &watch, 1);
+
 	return ret;
 	
 }

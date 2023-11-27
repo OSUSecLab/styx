@@ -23,8 +23,9 @@ static inline uint64_t time_get(void) {
 	return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
 }
 
-uint64_t pcd_eval_stopwatch_gettime() {
-	return time_get();
+void pcd_eval_stopwatch_gettime(uint64_t *watch) {
+	if(watch)
+		*watch = time_get();
 }
 
 void pcd_eval_stopwatch_start(uint64_t *watch) {
