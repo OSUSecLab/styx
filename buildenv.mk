@@ -161,6 +161,14 @@ C_Flags += -DPCD_CONFIG_DATASET
 endif
 endif
 
+# Performance Evaluations
+ifdef CONFIG_EVALUATION
+ifeq ($(CONFIG_EVALUATION), y)
+C_Files += $(ROOT_DIR)/framework/stopwatch.c
+C_Flags += -DPCD_CONFIG_EVAL
+endif
+endif
+
 # Select platform
 
 include $(ROOT_DIR)/platforms/$(CONFIG_PLATFORM)/platform_buildenv.mk
