@@ -104,14 +104,14 @@ void CPTask::run()
             free(message);
             break;
         }
-		printf("Received message...\n");
+		//printf("Received message...\n");
         clientfd = message->header.sockfd;
 
         status = pcd_sgx_attestation_prover_process_msg(e2_enclave_id, message, &resp_message, &resp_size);
 		if (status != 0) {
 			printf("ERROR: pcd_sgx_attestation_prover_process_msg returned %d\n", status);
 		}
-		printf("Processed message.\n");
+		//printf("Processed message.\n");
 
         if (send(clientfd, reinterpret_cast<char *>(resp_message), resp_size, 0) == -1)
         {
