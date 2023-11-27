@@ -40,7 +40,7 @@ void pcd_eval_stopwatch_lap(char *label, uint64_t *watch, char print) {
 	{
 		new_time = time_get();
 		if (print)
-			printf("time elapsed at %s is %llu\n", label, new_time - *watch);
+			printf("%s took %llu\n", label, new_time - *watch);
 		*watch = time_get();
 	}
 }
