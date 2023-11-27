@@ -9,6 +9,8 @@
 #include "data.h"
 #include "dataset.h"
 
+#include "stopwatch.h"
+
 static int pcd_policy_loaded = 0;
 static pcd_policy_disc_t pcd_policy_types[PCD_POLICY_TYPE_MAX_INDEX + 1] = { [0 ... PCD_POLICY_TYPE_MAX_INDEX] = { {0}, NULL} };
 
@@ -39,6 +41,10 @@ int pcd_policy_eval_over_dataset(pcd_dataset_t *dataset, pcd_identity_t *program
 	uint32_t argv[2];
 	int ret = PCD_OK;
 
+	PCD_EVAL_DEFINE_WATCH(watch);
+
+	pcd_eval_stopwatch_start(&watch);
+
 	// Instantiate policy module
 	for (i = 0; i < pcd_policy_loaded; i++) {
 		if (!pcd_compare_policy_type(&pcd_policy_types[i].disc_id, &dataset->policy_type)) {
@@ -53,6 +59,8 @@ int pcd_policy_eval_over_dataset(pcd_dataset_t *dataset, pcd_identity_t *program
 		pcd_log("INFO: No policy found\n");
 		return PCD_NOT_FOUND;
 	}
+
+	pcd_eval_stopwatch_lap("pcd_policy_eval_over_dataset: Instantiate policy module", &watch, 1);
 
 	// Copy all data in the dataset into the policy module
 	data_array_app_addr = pcd_runtime_malloc(disc_instance, (dataset->data_count + 1) * sizeof(pcd_runtime_pointer_t), (void *)&data_app_addr_array);
@@ -74,6 +82,8 @@ int pcd_policy_eval_over_dataset(pcd_dataset_t *dataset, pcd_identity_t *program
 		}
 	}
 
+	pcd_eval_stopwatch_lap("pcd_policy_eval_over_dataset: Copy all data into runtime", &watch, 1);
+
 	argv[0] = data_array_app_addr;
 	argv[1] = dataset->data_count;
 
@@ -84,7 +94,7 @@ int pcd_policy_eval_over_dataset(pcd_dataset_t *dataset, pcd_identity_t *program
 	else {
 		ret = argv[0];
 		if (ret == PCD_OK) {
-			pcd_log("INFO: Policy check passed\n");
+			//pcd_log("INFO: Policy check passed\n");
 			dataset->dataset_policy_passed = 1;
 			ret = PCD_OK;
 		}
@@ -96,8 +106,12 @@ int pcd_policy_eval_over_dataset(pcd_dataset_t *dataset, pcd_identity_t *program
 			pcd_log("INFO: pcd_runtime_execute_function returned %d\n", ret);
 		}
 	}
+
+	pcd_eval_stopwatch_lap("pcd_policy_eval_over_dataset: Evaluate policy", &watch, 1);
 fail:
 	pcd_runtime_deinstantiate_module(disc_instance);
+
+	pcd_eval_stopwatch_lap("pcd_policy_eval_over_dataset: Done", &watch, 1);
 	return ret;
 	
 }

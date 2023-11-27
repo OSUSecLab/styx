@@ -65,7 +65,7 @@ extern "C" int pcd_secret_register(pcd_identity_t *id, pcd_secret_t *input_secre
 	}
 
 	ret.first->second.secret = (pcd_secret_t *)malloc(sizeof(pcd_secret_t) + input_secret->secret_size);
-	pcd_log("INFO: secret size is %d\n", input_secret->secret_size);
+	//pcd_log("INFO: secret size is %d\n", input_secret->secret_size);
 	if (ret.first->second.secret == NULL) {
 		pcd_secret_mutex.unlock();
 		pcd_log_error("ERROR: Failed to allocate secret\n");
@@ -75,9 +75,9 @@ extern "C" int pcd_secret_register(pcd_identity_t *id, pcd_secret_t *input_secre
 	memcpy(ret.first->second.secret->secret, input_secret->secret, input_secret->secret_size);
 
 	pcd_secret_mutex.unlock();
-	pcd_log("INFO: ");
-	pcd_print_id(id);
-	pcd_log(" secret registered\n");
+	//pcd_log("INFO: ");
+	//pcd_print_id(id);
+	//pcd_log(" secret registered\n");
 	return PCD_OK;
 }
 
@@ -199,9 +199,9 @@ extern "C" int pcd_secret_retrieve(pcd_identity_t *id, pcd_secret_t **output_sec
 		return PCD_NOT_FOUND;
 	}
 
-	pcd_log("INFO: ");
-	pcd_print_id(id);
-	pcd_log(" secret found\n");
+	//pcd_log("INFO: ");
+	//pcd_print_id(id);
+	//pcd_log(" secret found\n");
 	
 	it->second.counter += 1;
 	*output_secret = it->second.secret;

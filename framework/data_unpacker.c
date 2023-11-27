@@ -37,7 +37,6 @@ int pcd_data_unpacker_decrypt_payload(void *enc_payload_with_mac, size_t enc_siz
 		return status;
 	}
 	
-	pcd_log("algo is %d\n", crypto_algo);
 	// Get MAC size and set enc_payload
 	mac_size = algo->mac_size;
 	enc_payload = enc_payload_with_mac + mac_size;
