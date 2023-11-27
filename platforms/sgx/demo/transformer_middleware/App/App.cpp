@@ -112,7 +112,7 @@ static int client_send_receive(char *req_msg, size_t req_size, char **resp_msg, 
         return -1;
     }
 
-	printf("INFO: req_msg type is %d\n", ((pcd_sgx_attestation_msg_t*)req_msg)->header.type);
+	//printf("INFO: req_msg type is %d\n", ((pcd_sgx_attestation_msg_t*)req_msg)->header.type);
 
     server_addr.sun_family = AF_UNIX;
     
