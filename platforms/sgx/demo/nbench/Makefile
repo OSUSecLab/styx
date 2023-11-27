@@ -149,7 +149,7 @@ nbench.aot : nbench
 ##########################################################################
 
 clean:
-	- /bin/rm -f *.o *~ \#* core a.out hello sysinfo.c sysinfoc.c \
+	- /bin/rm -f *.o *~ \#* sysinfo.c sysinfoc.c \
 		 bug pointer debugbit.dat nbench nbench.aot
 
 mrproper: clean
