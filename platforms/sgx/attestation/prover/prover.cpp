@@ -201,7 +201,7 @@ extern "C" ATTESTATION_STATUS ecall_generate_response(secure_message_t* req_mess
     plaintext = (const uint8_t*)(" ");
     plaintext_length = 0;
 	
-	pcd_log("INFO: entering generate_response\n");
+	//pcd_log("INFO: entering generate_response\n");
 
     if(!req_message || !resp_message)
     {
@@ -211,8 +211,8 @@ extern "C" ATTESTATION_STATUS ecall_generate_response(secure_message_t* req_mess
     // Get the session information from the map corresponding to the source enclave id
     session_info = get_session_info(session_id);
     if (session_info == NULL) {
-	pcd_log_error("ERROR: Prover: Cannot find session\n");
-	return INVALID_SESSION;
+	    pcd_log_error("ERROR: Prover: Cannot find session\n");
+	    return INVALID_SESSION;
     }
 
     if(session_info->status != ACTIVE)
@@ -256,7 +256,7 @@ extern "C" ATTESTATION_STATUS ecall_generate_response(secure_message_t* req_mess
         return status;
     }
 	
-	pcd_log("INFO: Successfully decrypted message payload\n");
+	//pcd_log("INFO: Successfully decrypted message payload\n");
 
     // Verify if the nonce obtained in the request is equal to the session nonce
     if(*((uint32_t*)req_message->message_aes_gcm_data.reserved) != session_info->active.counter || *((uint32_t*)req_message->message_aes_gcm_data.reserved) > ((uint32_t)-2))
@@ -275,7 +275,7 @@ extern "C" ATTESTATION_STATUS ecall_generate_response(secure_message_t* req_mess
         return INVALID_SESSION;
     }
 
-	pcd_log("INFO: Successfully generated response\n");
+	//pcd_log("INFO: Successfully generated response\n");
 
     if(resp_data_length > max_payload_size)
     {

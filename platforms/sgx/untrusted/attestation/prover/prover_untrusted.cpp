@@ -146,7 +146,7 @@ extern "C" int pcd_sgx_attestation_prover_process_msg(sgx_enclave_id_t enclave_i
 
 	switch (in_msg->header.type) {
 		case PCD_SGX_ATT_DH_REQ_MSG1:
-			pcd_log("INFO: Received MSG1 REQ\n");
+			//pcd_log("INFO: Received MSG1 REQ\n");
 			*out_msg_size = sizeof(pcd_sgx_attestation_msg_t) + sizeof(pcd_sgx_attestation_msg_dh_1_resp_t);
 			*out_msg = (pcd_sgx_attestation_msg_t *)malloc(*out_msg_size);
 			if (*out_msg == NULL) {
@@ -164,7 +164,7 @@ extern "C" int pcd_sgx_attestation_prover_process_msg(sgx_enclave_id_t enclave_i
 			}
 			return 0;
 		case PCD_SGX_ATT_DH_MSG2:
-			pcd_log("INFO: Received MSG2\n");
+			//pcd_log("INFO: Received MSG2\n");
 			*out_msg_size = sizeof(pcd_sgx_attestation_msg_t) + sizeof(pcd_sgx_attestation_msg_dh_3_t);
 			*out_msg = (pcd_sgx_attestation_msg_t *)malloc(*out_msg_size);
 			if (*out_msg == NULL) {
@@ -183,7 +183,7 @@ extern "C" int pcd_sgx_attestation_prover_process_msg(sgx_enclave_id_t enclave_i
 			}
 			return 0;
 		case PCD_SGX_ATT_DH_MSG_REQ:
-			pcd_log("INFO: Received REQ\n");
+			//pcd_log("INFO: Received REQ\n");
 			*out_msg_size = sizeof(pcd_sgx_attestation_msg_t) + sizeof(secure_message_t) + ((pcd_sgx_attestation_msg_req_t *)in_msg->msgbuf)->max_payload_size;
 			*out_msg = (pcd_sgx_attestation_msg_t *)malloc(*out_msg_size);
 			if (*out_msg == NULL) {

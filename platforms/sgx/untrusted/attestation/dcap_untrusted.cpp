@@ -221,7 +221,7 @@ extern "C" uint32_t ocall_ecdsa_quote_verification(uint8_t* quote_buffer, uint32
     case SGX_QL_QV_RESULT_OUT_OF_DATE_CONFIG_NEEDED:
     case SGX_QL_QV_RESULT_SW_HARDENING_NEEDED:
     case SGX_QL_QV_RESULT_CONFIG_AND_SW_HARDENING_NEEDED:
-        pcd_log_warning("\tWarning: App: Verification completed with Non-terminal result: %x\n", quote_verification_result);
+        //pcd_log_warning("\tWarning: App: Verification completed with Non-terminal result: %x\n", quote_verification_result);
         ret = 1;
         break;
     case SGX_QL_QV_RESULT_INVALID_SIGNATURE:

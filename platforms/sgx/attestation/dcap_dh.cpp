@@ -662,7 +662,7 @@ static sgx_status_t dh_dcap_generate_message3(const pcd_dh_dcap_msg2_t *msg2,
         return se_ret;
     }
 
-	pcd_log("INFO: msg3->cmac is 0x%016llX\n", ((uint64_t *)msg3->cmac)[0]);
+	//pcd_log("INFO: msg3->cmac is 0x%016llX\n", ((uint64_t *)msg3->cmac)[0]);
 
     return SGX_SUCCESS;
 

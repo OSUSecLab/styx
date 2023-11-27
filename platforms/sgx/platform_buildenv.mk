@@ -126,9 +126,13 @@ Untrusted_Cpp_Files += $(wildcard $(PLATFORM_DIR)/untrusted/attestation/*.cpp)
 endif
 endif
 
+ifdef CONFIG_NEED_RUNTIME
+ifeq ($(CONFIG_NEED_RUNTIME), y)
 ifdef CONFIG_RUNTIME_WAMR
 ifeq ($(CONFIG_RUNTIME_WAMR), y)
 Untrusted_C_Files += $(PLATFORM_DIR)/untrusted/read_file_outside.c
+endif
+endif
 endif
 endif
 
