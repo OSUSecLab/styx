@@ -309,7 +309,7 @@ uint32_t pcd_runtime_execute_function(pcd_instance_t *instance, char *func_name,
 	}
 
 	if (wasm_runtime_call_wasm(exec_env, func, argc, argv) ) {
-		pcd_log("INFO: %s function returned %d\n", func_name, argv[0]);
+		//pcd_log("INFO: %s function returned %d\n", func_name, argv[0]);
 	}
 	else {
 		pcd_log_error("ERROR: Failed to call %s. %s\n", func_name, wasm_runtime_get_exception((wasm_module_inst_t)instance));
