@@ -8,7 +8,7 @@
 
 typedef uuid_t pcd_identity_t;
 
-static inline int pcd_compare_identity(pcd_identity_t *i1, pcd_identity_t *i2) 
+static inline int pcd_compare_identity(const pcd_identity_t *i1, const pcd_identity_t *i2) 
 {
 	return pcd_compare_uuid((uuid_t *)i1, (uuid_t *)i2);
 }

@@ -136,7 +136,7 @@ extern "C" int pcd_secret_fetch(pcd_identity_t *id, pcd_delegator_addr_t *delega
 
 	// map.find(*id) doesn't seem to work for no good reason...
 	for (it = pcd_secret_store.begin(); it != pcd_secret_store.end(); it++) {
-		if (it->first == *id) {
+		if (!pcd_compare_identity(&it->first, id)) {
 			break;
 		}
 	}
@@ -163,7 +163,7 @@ extern "C" int pcd_secret_fetch(pcd_identity_t *id, pcd_delegator_addr_t *delega
 
 	free(*output_secret);
 	pcd_secret_retrieve(id, output_secret);
-	pcd_secret_release(id);
+	//pcd_secret_release(id);
 
 	return status;
 }

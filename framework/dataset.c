@@ -38,11 +38,12 @@ uint32_t pcd_dataset_new(uint32_t dataset_max_size) {
 			pcd_datasets[i]->dataset_policy_passed = 0;
 			pcd_datasets[i]->data_count = 0;
 			memset(&pcd_datasets[i]->policy_type, 0, sizeof(pcd_policy_type_t));
+			pcd_eval_stopwatch_lap("pcd_dataset_new: New dataset", &watch, 1);
 			return i;
 		}
 	}
 
-	pcd_eval_stopwatch_lap("New dataset", &watch, 1);
+	pcd_eval_stopwatch_lap("pcd_dataset_new: New dataset", &watch, 1);
 
 	return -PCD_OUT_OF_RANGE;
 }
