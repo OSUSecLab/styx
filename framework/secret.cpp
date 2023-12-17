@@ -117,6 +117,45 @@ extern "C" int pcd_secret_release(pcd_identity_t *id) {
 	return PCD_OK;
 }
 
+extern "C" int pcd_secret_retrieve(pcd_identity_t *id, pcd_secret_t **output_secret) {
+	std::map<pcd_identity_t, pcd_secret_store_entry_t>::iterator it;
+	
+	pcd_secret_mutex.lock();
+
+	// map.find(*id) doesn't seem to work for no good reason...
+	for (it = pcd_secret_store.begin(); it != pcd_secret_store.end(); it++) {
+		if (it->first == *id) {
+			break;
+		}
+	}
+
+	if(it == pcd_secret_store.end()) {
+		pcd_secret_mutex.unlock();
+		//pcd_log("INFO: ");
+		//pcd_print_id(id);
+		//pcd_log(" secret not found\n");
+		//pcd_log("INFO: secret store has keys for\n");
+		/*for (it = pcd_secret_store.begin(); it != pcd_secret_store.end(); it++) {
+			pcd_log("      + ");
+			pcd_print_id((pcd_identity_t *)(&it->first));
+			pcd_log("\n");
+			if (it->first == *id) {
+				pcd_log("INFO: WTF? You are finding one!\n");
+			}
+		}*/
+		return PCD_NOT_FOUND;
+	}
+
+	//pcd_log("INFO: ");
+	//pcd_print_id(id);
+	//pcd_log(" secret found\n");
+	
+	it->second.counter += 1;
+	*output_secret = it->second.secret;
+	pcd_secret_mutex.unlock();
+
+	return PCD_OK;
+}
 
 #ifdef PCD_CONFIG_SECRET_REQUESTER
 
@@ -130,25 +169,12 @@ extern "C" int pcd_secret_fetch(pcd_identity_t *id, pcd_delegator_addr_t *delega
 		return PCD_NULL_ARG;
 	}
 
-	// Only allow one thread to fetch secret to avoid race
-	pcd_secret_fetch_lock.lock();
-	pcd_secret_mutex.lock();
-
-	// map.find(*id) doesn't seem to work for no good reason...
-	for (it = pcd_secret_store.begin(); it != pcd_secret_store.end(); it++) {
-		if (!pcd_compare_identity(&it->first, id)) {
-			break;
-		}
-	}
-
-	if(it != pcd_secret_store.end()) {
-		it->second.counter += 1;
-		*output_secret = it->second.secret;
-		pcd_secret_mutex.unlock();
-		pcd_secret_fetch_lock.unlock();
+	if (pcd_secret_retrieve(id, output_secret) == PCD_OK) {
 		return PCD_OK;
 	}
-	pcd_secret_mutex.unlock();
+
+	// Only allow one thread to fetch secret to avoid race
+	pcd_secret_fetch_lock.lock();
 
 	// Not found in the 
 	status = pcd_request_secret(id, (char *)delegator_addr, output_secret);
@@ -169,43 +195,3 @@ extern "C" int pcd_secret_fetch(pcd_identity_t *id, pcd_delegator_addr_t *delega
 }
 
 #endif
-
-extern "C" int pcd_secret_retrieve(pcd_identity_t *id, pcd_secret_t **output_secret) {
-	std::map<pcd_identity_t, pcd_secret_store_entry_t>::iterator it;
-	
-	pcd_secret_mutex.lock();
-
-	// map.find(*id) doesn't seem to work for no good reason...
-	for (it = pcd_secret_store.begin(); it != pcd_secret_store.end(); it++) {
-		if (it->first == *id) {
-			break;
-		}
-	}
-
-	if(it == pcd_secret_store.end()) {
-		pcd_secret_mutex.unlock();
-		pcd_log("INFO: ");
-		pcd_print_id(id);
-		pcd_log(" secret not found\n");
-		pcd_log("INFO: secret store has keys for\n");
-		for (it = pcd_secret_store.begin(); it != pcd_secret_store.end(); it++) {
-			pcd_log("      + ");
-			pcd_print_id((pcd_identity_t *)(&it->first));
-			pcd_log("\n");
-			if (it->first == *id) {
-				pcd_log("INFO: WTF? You are finding one!\n");
-			}
-		}
-		return PCD_NOT_FOUND;
-	}
-
-	//pcd_log("INFO: ");
-	//pcd_print_id(id);
-	//pcd_log(" secret found\n");
-	
-	it->second.counter += 1;
-	*output_secret = it->second.secret;
-	pcd_secret_mutex.unlock();
-
-	return PCD_OK;
-}
