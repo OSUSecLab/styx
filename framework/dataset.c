@@ -72,7 +72,7 @@ uint32_t pcd_dataset_add_data(uint32_t dataset_index, pcd_enc_data_t *input_data
 		pcd_log_error("ERROR: pcd_dataset_add_data: Failed to fetch secret with %d\n", status);
 		return status;
 	}
-	pcd_log("INFO: pcd_dataset_add_data: fetched secret\n");
+	//pcd_log("INFO: pcd_dataset_add_data: fetched secret\n");
 
 	pcd_eval_stopwatch_lap("pcd_dataset_add_data: Fecth secret", &watch, 1);
 

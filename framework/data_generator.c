@@ -28,14 +28,6 @@ int pcd_generate_data(void *data, size_t data_size,
 		return PCD_NULL_ARG;
 	}
 
-	for (j = 0; j < 3; j++) {
-		pcd_log("[?] dataset: DEBUG: payload[%02d]: ", j);
-		for (k = 0; k < 8; k++) {
-			pcd_log("%02X ", payload_test[j * 8 + k]);
-		}
-		pcd_log("\n");
-	}
-
 	// Get key from secret storage
 	status = pcd_secret_retrieve(data_owner_id, &secret);
 	if(status != PCD_OK) {
