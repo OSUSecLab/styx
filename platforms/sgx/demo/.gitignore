@@ -1,3 +1,4 @@
 *.hash
 input_3
 mnist.onnx
+*.dat
