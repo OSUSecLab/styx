@@ -74,7 +74,7 @@ int pcd_policy_eval_over_dataset(pcd_dataset_t *dataset, pcd_identity_t *program
 		// Copy each payload
 		data_app_addr_array[i] = pcd_runtime_copy_data_into_runtime(disc_instance, dataset->payload_pointers[i], 
 						sizeof(pcd_payload_t) + dataset->payload_pointers[i]->data_size
-						 + dataset->payload_pointers[i]->policy_size + dataset->payload_pointers[i]->tag_size);
+						 + dataset->payload_pointers[i]->policy_size + dataset->payload_pointers[i]->tag_size + dataset->payload_pointers[i]->attribute_size);
 		if (data_app_addr_array[i] == 0) {
 			pcd_log_error("ERROR: Failed to copy data [%d]\n", i);
 			ret = PCD_RUNTIME_ERR;
