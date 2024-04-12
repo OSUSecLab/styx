@@ -8,3 +8,6 @@
 	path = platforms/sgx/demo/libonnx-native
 	url = https://github.com/NSKernel/libonnx-pcd
 	branch = native
+[submodule "platforms/sgx/demo/libsvm"]
+	path = platforms/sgx/demo/libsvm
+	url = https://github.com/NSKernel/libsvm-pcd

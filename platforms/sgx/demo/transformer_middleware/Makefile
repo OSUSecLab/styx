@@ -9,6 +9,7 @@ SGX_ARCH ?= x64
 SGX_DEBUG ?= 1
 
 PCD_DEMO_USE_NATIVE_LIBONNX := y
+PCD_DEMO_USE_LIBSVM := y
 
 ifeq ($(shell getconf LONG_BIT), 32)
 	SGX_ARCH := x86
@@ -107,7 +108,20 @@ Enclave_Include_Paths := -IEnclave -I$(PCD_ROOT)/include \
                          -I$(SGX_SDK)/include/stlport \
 						 -I$(SGX_SDK)/include/libcxx
 
-Enclave_C_Flags := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fstack-protector $(Enclave_Include_Paths) -DPCD_CONFIG_ROLE_CHALLENGER -DPCD_CONFIG_RUNTIME_WAMR -DPCD_DEMO_USE_NATIVE_LIBONNX
+Enclave_C_Flags := $(SGX_COMMON_CFLAGS) -nostdinc -fvisibility=hidden -fpie -fstack-protector $(Enclave_Include_Paths) -DPCD_CONFIG_ROLE_CHALLENGER -DPCD_CONFIG_RUNTIME_WAMR
+
+ifdef PCD_DEMO_USE_NATIVE_LIBONNX
+ifeq ($(PCD_DEMO_USE_LIBSVM), y)
+Enclave_C_Flags += -DPCD_DEMO_USE_NATIVE_LIBONNX
+endif
+endif
+
+ifdef PCD_DEMO_USE_LIBSVM
+ifeq ($(PCD_DEMO_USE_LIBSVM), y)
+Enclave_C_Flags += -DPCD_DEMO_USE_LIBSVM -I../libsvm/
+endif
+endif
+
 Enclave_Cpp_Flags := $(Enclave_C_Flags) -std=c++03 -nostdinc++
 
 Enclave_Security_Link_Flags := -Wl,-z,relro,-z,now,-z,noexecstack
@@ -198,6 +212,10 @@ Enclave/Enclave_t.o: Enclave/Enclave_t.c
 	@$(CC) $(Enclave_C_Flags) -c $< -o $@
 	@echo "CC   <=  $<"
 
+Enclave/rand.o: Enclave/rand.c
+	@$(CC) $(Enclave_C_Flags) -c $< -o $@
+	@echo "CC   <=  $<"
+
 Enclave/%.o: Enclave/%.cpp Enclave/Enclave_t.h
 	@$(CXX) $(Enclave_Cpp_Flags) -c $< -o $@
 	@echo "CXX  <=  $<"
@@ -206,8 +224,12 @@ libtpcd.a: $(PCD_ROOT)/libtpcd.a
 	@cp $< $@
 	@echo "CP $@  <=  $<"
 
+LIBONNX_PATH := 
+LIBSVM_PATH :=
+
 ifdef PCD_DEMO_USE_NATIVE_LIBONNX
 ifeq ($(PCD_DEMO_USE_NATIVE_LIBONNX), y)
+LIBONNX_PATH += libonnx.a
 ../libonnx-native/src/libonnx.a: 
 	@echo "MAKE $@"
 	@make -C ../libonnx-native/src/
@@ -215,22 +237,25 @@ ifeq ($(PCD_DEMO_USE_NATIVE_LIBONNX), y)
 libonnx.a: ../libonnx-native/src/libonnx.a
 	@cp $< $@
 	@echo "CP $@  <=  $<"
-$(Enclave_Name): $(Enclave_Cpp_Objects) libtpcd.a libonnx.a Enclave/Enclave_t.o
-	@$(CXX) $^ -o $@ $(Enclave_Link_Flags)
-	@echo "Building with native libonnx"
-	@echo "LINK =>  $@"
-else
-$(Enclave_Name): $(Enclave_Cpp_Objects) libtpcd.a Enclave/Enclave_t.o
-	@$(CXX) $^ -o $@ $(Enclave_Link_Flags)
-	@echo "Building without native libonnx"
-	@echo "LINK =>  $@"
 endif
-else
-$(Enclave_Name): $(Enclave_Cpp_Objects) libtpcd.a Enclave/Enclave_t.o
-	@$(CXX) $^ -o $@ $(Enclave_Link_Flags)
-	@echo "Building without native libonnx"
-	@echo "LINK =>  $@"
 endif
+
+ifdef PCD_DEMO_USE_LIBSVM
+ifeq ($(PCD_DEMO_USE_LIBSVM), y)
+LIBSVM_PATH += libsvm.a
+../libsvm/libsvm.a: 
+	@echo "MAKE $@"
+	@make -C ../libsvm/
+
+libsvm.a: ../libsvm/libsvm.a
+	@cp $< $@
+	@echo "CP $@  <=  $<"
+endif
+endif
+
+$(Enclave_Name): $(Enclave_Cpp_Objects) libtpcd.a $(LIBONNX_PATH) $(LIBSVM_PATH) Enclave/Enclave_t.o Enclave/rand.o
+	@$(CXX) $^ -o $@ $(Enclave_Link_Flags)
+	@echo "LINK =>  $@ $(LIBONNX_PATH) $(LIBSVM_PATH)"
 
 $(Signed_Enclave_Name): $(Enclave_Name)
 	@$(SGX_ENCLAVE_SIGNER) sign -key Enclave/Enclave_private_test.pem -enclave $(Enclave_Name) -out $@ -config $(Enclave_Config_File)
@@ -239,4 +264,4 @@ $(Signed_Enclave_Name): $(Enclave_Name)
 .PHONY: clean
 
 clean:
-	@rm -f $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name) $(App_Cpp_Objects) App/Enclave_u.* $(Enclave_Cpp_Objects) Enclave/Enclave_t.* libtpcd.a libupcd.a libonnx.a
+	@rm -f $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name) $(App_Cpp_Objects) App/Enclave_u.* $(Enclave_Cpp_Objects) Enclave/Enclave_t.* libtpcd.a libupcd.a $(LIBONNX_PATH) $(LIBSVM_PATH)
