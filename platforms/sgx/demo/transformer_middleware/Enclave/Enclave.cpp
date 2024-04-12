@@ -172,19 +172,199 @@ pcd_runtime_pointer_t onnx_context_alloc_wrapper(wasm_exec_env_t exec_env, const
 void onnx_context_free_wrapper(wasm_exec_env_t exec_env, void * ctx) {
 	onnx_context_free(ctx);
 }
+}
+#endif
+
+#ifdef PCD_DEMO_USE_LIBSVM
+
+#include <svm.h>
+
+extern "C" {
+
+int svm_check_parameter_wrapper(wasm_exec_env_t exec_env, const struct svm_problem *prob, const struct svm_parameter *param) {
+	return svm_check_parameter(prob, param);
+}
+
+uint64_t svm_train_wrapper(wasm_exec_env_t exec_env, const struct svm_problem *prob, const struct svm_parameter *param) {
+	return (uint64_t)(svm_train(prob, param));
+}
+
+void svm_free_and_destroy_model_wrapper(wasm_exec_env_t exec_env, struct svm_model **model_ptr_ptr) {
+	svm_free_and_destroy_model(model_ptr_ptr);
+}
+
+void svm_destroy_param_wrapper(wasm_exec_env_t exec_env, struct svm_parameter *param) {
+	svm_destroy_param(param);
+}
 
 
+pcd_runtime_pointer_t svm_new_param(wasm_exec_env_t exec_env) {
+	pcd_instance_t *instance = (pcd_instance_t *)(wasm_runtime_get_module_inst(exec_env));
+	struct svm_parameter *param = NULL;
+	pcd_runtime_pointer_t app_param;
+
+	app_param = pcd_runtime_malloc(instance, sizeof(struct svm_parameter), (void **)&param);
+	if (param == NULL) {
+		printf("Error: svm_init_param: Failed to allocate parameters\n");
+		return 0;
+	}
+
+	param->svm_type = C_SVC;
+	param->kernel_type = RBF;
+	param->degree = 3;
+	param->gamma = 0;	// 1/num_features
+	param->coef0 = 0;
+	param->nu = 0.5;
+	param->cache_size = 100;
+	param->C = 1;
+	param->eps = 1e-3;
+	param->p = 0.1;
+	param->shrinking = 1;
+	param->probability = 0;
+	param->nr_weight = 0;
+	param->weight_label = NULL;
+	param->weight = NULL;
+
+	return app_param;
+}
+
+void svm_free_param(wasm_exec_env_t exec_env, struct svm_parameter *param) {
+	pcd_instance_t *instance = (pcd_instance_t *)(wasm_runtime_get_module_inst(exec_env));
+
+	pcd_runtime_free(instance, pcd_runtime_native_to_app(instance, param));
+}
+
+void svm_free_problem(wasm_exec_env_t exec_env, struct svm_problem *prob) {
+	pcd_instance_t *instance = (pcd_instance_t *)(wasm_runtime_get_module_inst(exec_env));
+	if (prob->x != NULL) {
+		if (prob->x[0] != NULL) {
+			// x_space
+			free(prob->x[0]);
+		}
+		free(prob->x);
+	}
+	if (prob->y != NULL) {
+		free(prob->y);
+	}
+
+	pcd_runtime_free(instance, pcd_runtime_native_to_app(instance, prob));
+}
+
+pcd_runtime_pointer_t svm_dataset_to_problem(wasm_exec_env_t exec_env, pcd_runtime_pointer_t *feature_vectors, pcd_runtime_pointer_t *labels, int *record_counts, int datasets, int feature_vector_length, struct svm_parameter *param) {
+	int dataset_iterator, record_iterator, global_record_iterator = 0;
+	int feature_iterator;
+	pcd_runtime_pointer_t app_feature_vector;
+	pcd_runtime_pointer_t app_label;
+	int record_count;
+	double *feature_vector;
+	double *label;
+	int total_record_count = 0;
+	pcd_instance_t *instance = (pcd_instance_t *)(wasm_runtime_get_module_inst(exec_env));
+
+	struct svm_problem *prob = NULL;
+	pcd_runtime_pointer_t app_prob;
+	struct svm_node *x_space = NULL;
+	
+	// Count total records of all datasets
+	for (dataset_iterator = 0; dataset_iterator < datasets; dataset_iterator++) {
+		total_record_count += record_counts[dataset_iterator];
+	}
+
+	// Allocate problem
+	app_prob = pcd_runtime_malloc(instance, sizeof(struct svm_problem), (void **)&prob);
+	if (prob == NULL) {
+		printf("Error: svm_dataset_to_problem: failed to allocate problem\n");
+		goto error_out;
+	}
+	prob->l = total_record_count;
+	printf("[?] INFO: total records: %d\n", total_record_count);
+	prob->y = (double *)malloc(sizeof(double) * total_record_count);
+	if (prob->y == NULL) {
+		printf("Error: svm_dataset_to_problem: failed to allocate prob->y\n");
+		goto error_prob;
+	}
+	prob->x = (struct svm_node **)malloc(sizeof(struct svm_node *) * total_record_count);
+	if (prob->x == NULL) {
+		printf("Error: svm_dataset_to_problem: failed to allocate prob->x\n");
+		goto error_y;
+	}
+	// feature_vector_length + 1 is because each feature vector must end with an extra -1
+	x_space = (struct svm_node *)malloc(sizeof(struct svm_node) * (feature_vector_length + 1) * total_record_count);
+	if (x_space == NULL) {
+		printf("Error: svm_dataset_to_problem: failed to allocate x_space\n");
+		goto error_x;
+	}
+
+	for (dataset_iterator = 0; dataset_iterator < datasets; dataset_iterator++) {
+		app_feature_vector = feature_vectors[dataset_iterator];
+		app_label = labels[dataset_iterator];
+		record_count = record_counts[dataset_iterator];
+
+		feature_vector = (double *)pcd_runtime_app_to_native(instance, app_feature_vector);
+		label = (double *)pcd_runtime_app_to_native(instance, app_label);
+
+		for (record_iterator = 0; record_iterator < record_count; record_iterator++) {
+			// Set label
+			prob->y[global_record_iterator] = label[record_iterator];
+
+			// Set feature vector
+			prob->x[global_record_iterator] = &(x_space[global_record_iterator * (feature_vector_length + 1)]);
+			for (feature_iterator = 0; feature_iterator < feature_vector_length; feature_iterator++) {
+				x_space[global_record_iterator * (feature_vector_length + 1) + feature_iterator].index = feature_iterator + 1;
+				x_space[global_record_iterator * (feature_vector_length + 1) + feature_iterator].value = feature_vector[record_iterator * feature_vector_length + feature_iterator];
+			}
+			x_space[global_record_iterator * (feature_vector_length + 1) + feature_vector_length].index = -1;
+			global_record_iterator += 1;
+		}
+
+	}
+
+	if(param->gamma == 0)
+		param->gamma = 1.0 / feature_vector_length;
+
+	return app_prob;
+
+error_x_space:
+	free(x_space);
+error_x:
+	free(prob->x);
+error_y:
+	free(prob->y);
+error_prob:
+	pcd_runtime_free(instance, app_prob);
+error_out:
+	return 0;
+}
+
+}
+
+#endif
+
+extern "C" {
 static struct native_symbol {
 	const char *name;
 	void *ptr;
 	const char *signature;
 } pcd_dataset_native_symbols[] = 
 {
-    { "onnx_get_graph_nlen", 		(void*)onnx_get_graph_nlen_wrapper,	"(*)i" },
-    { "onnx_benchmark_get_name", 	(void*)onnx_benchmark_get_name_wrapper, "(*i)i" },
-    { "onnx_run_single_node", 		(void*)onnx_run_single_node_wrapper, 	"(*i)" },
-    { "onnx_context_alloc", 		(void*)onnx_context_alloc_wrapper, 	"(*i*i)i" },
-    { "onnx_context_free", 		(void*)onnx_context_free_wrapper, 	"(*)" }
+#ifdef PCD_DEMO_USE_NATIVE_LIBONNX
+	{ "onnx_get_graph_nlen", 		(void*)onnx_get_graph_nlen_wrapper,	"(*)i" },
+	{ "onnx_benchmark_get_name", 	(void*)onnx_benchmark_get_name_wrapper, "(*i)i" },
+	{ "onnx_run_single_node", 		(void*)onnx_run_single_node_wrapper, 	"(*i)" },
+	{ "onnx_context_alloc", 		(void*)onnx_context_alloc_wrapper, 	"(*i*i)i" },
+	{ "onnx_context_free", 		(void*)onnx_context_free_wrapper, 	"(*)" },
+#endif
+
+#ifdef PCD_DEMO_USE_LIBSVM
+	{ "svm_free_and_destroy_model",	(void*)svm_free_and_destroy_model_wrapper,	"(*)" },
+	{ "svm_destroy_param",		(void*)svm_destroy_param_wrapper,	"(*)" },
+	{ "svm_train",			(void*)svm_train_wrapper,		"(**)I" },
+	{ "svm_check_parameter",	(void*)svm_check_parameter_wrapper,	"(**)i" },
+	{ "svm_new_param", 		(void*)svm_new_param,			"()i" },
+	{ "svm_free_param", 		(void*)svm_free_param,			"(*)" },
+	{ "svm_free_problem", 		(void*)svm_free_problem,		"(*)" },
+	{ "svm_dataset_to_problem", 	(void*)svm_dataset_to_problem,		"(***ii*)i" },
+#endif
 };
 }
 
@@ -193,7 +373,7 @@ int register_native_symbols() {
 	int i;
 	int ret = 0;
 
-	for (i = 0; i < 5; i++) {
+	for (i = 0; i < (sizeof(pcd_dataset_native_symbols) / sizeof(struct native_symbol)); i++) {
 		if ((ret = pcd_wamr_register_native_symbol(
 			pcd_dataset_native_symbols[i].name,
 			pcd_dataset_native_symbols[i].ptr,
@@ -206,14 +386,10 @@ int register_native_symbols() {
 	return 0;
 }
 
-#endif
-
 extern "C" void ecall_init_env() {
 	pcd_runtime_setup_environment();
 	// Add library symbols
-#ifdef PCD_DEMO_USE_NATIVE_LIBONNX
 	register_native_symbols();
-#endif
 	pcd_crypto_init();
 	set_enclave_trust_verifier(&verify_peer_trust);
 

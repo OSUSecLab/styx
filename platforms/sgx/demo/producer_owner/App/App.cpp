@@ -219,6 +219,64 @@ char *read_file_to_buffer(const char *filename, size_t *ret_size) {
     return buffer;
 }
 
+static char *line = NULL;
+static int max_line_len = 1024;
+
+static char* readline(FILE *input)
+{
+	int len;
+
+    if (line == NULL) {
+        line = (char *)malloc(max_line_len);
+    }
+
+	if(fgets(line,max_line_len,input) == NULL)
+		return NULL;
+
+	while(strrchr(line,'\n') == NULL)
+	{
+		max_line_len *= 2;
+		line = (char *) realloc(line,max_line_len);
+		len = (int) strlen(line);
+		if(fgets(line+len,max_line_len-len,input) == NULL)
+			break;
+	}
+	return line;
+}
+
+// Breast Cancer Wisconsin (Diagnostic)
+double cancer_dataset[31 * 569];
+
+int read_cancer_dataset(int *total_count_ptr) {
+    FILE *fp = fopen("../wdbc.data" ,"r");
+    int total = 0, i, j;
+
+    if (fp == NULL) {
+		printf("[-] ERROR: can't open input file ../wdbc.data\n");
+		return -1;
+	}
+
+    while(readline(fp) != NULL) {
+		total += 1;
+	}
+	rewind(fp);
+
+    if (total != 569) {
+        printf("[-] Dataset size mismatch! Total = %d\n", total);
+    }
+
+    for (i = 0; i < total; i++) {
+        readline(fp);
+        // Ugly but easy
+        sscanf(line, "%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &cancer_dataset[31 * i], &cancer_dataset[31 * i + 1], &cancer_dataset[31 * i + 2], &cancer_dataset[31 * i + 3], &cancer_dataset[31 * i + 4], &cancer_dataset[31 * i + 5], &cancer_dataset[31 * i + 6], &cancer_dataset[31 * i + 7], &cancer_dataset[31 * i + 8], &cancer_dataset[31 * i + 9], &cancer_dataset[31 * i + 10], &cancer_dataset[31 * i + 11], &cancer_dataset[31 * i + 12], &cancer_dataset[31 * i + 13], &cancer_dataset[31 * i + 14], &cancer_dataset[31 * i + 15], &cancer_dataset[31 * i + 16], &cancer_dataset[31 * i + 17], &cancer_dataset[31 * i + 18], &cancer_dataset[31 * i + 19], &cancer_dataset[31 * i + 20], &cancer_dataset[31 * i + 21], &cancer_dataset[31 * i + 22], &cancer_dataset[31 * i + 23], &cancer_dataset[31 * i + 24], &cancer_dataset[31 * i + 25], &cancer_dataset[31 * i + 26], &cancer_dataset[31 * i + 27], &cancer_dataset[31 * i + 28], &cancer_dataset[31 * i + 29], &cancer_dataset[31 * i + 30]);
+    }
+
+    *total_count_ptr = total;
+    fclose(fp);
+    printf("[+] Cancer dataset loaded\n");
+    return 0;
+}
+
 char cmdbuffer[100];
 char outbuffer[100];
 
@@ -245,6 +303,8 @@ int main(int argc, char *argv[])
     size_t input_size;
     int i;
     uint8_t rule_mask;
+    int cancer_dataset_records;
+    int from, to, perc_cap;
 
     char *uuid_path;
     char *hash_path;
@@ -281,6 +341,9 @@ int main(int argc, char *argv[])
         return -1;
     }
 
+    if (read_cancer_dataset(&cancer_dataset_records)) {
+        printf("ERROR: failed to read cancer dataset\n");
+    }
 
     // Create enclave
     if (load_enclave()) {
@@ -294,7 +357,7 @@ int main(int argc, char *argv[])
 
 	pcd_sgx_attestation_register_send_receive((void *)&client_send_receive);
 
-    output_data = (char *)malloc(8192);
+    output_data = (char *)malloc(160000);
     if (output_data == NULL) {
         printf("ERROR: Failed to malloc output_data\n");
         if_continue = false;
@@ -314,9 +377,36 @@ int main(int argc, char *argv[])
             printf("o <uuid path>:                                  load new owner uuid\n");
             printf("h <hash path>:                                  load new target program hash\n");
             printf("g <num count> <nums> <rule mask> <output path>: generate data\n");
+            printf("c <from> <to> <perc_cap> <output path>:         generate cancer data with percentage cap\n");
             printf("a <input path> <rule mask> <output path>:       pack data\n");
             printf("p:                                              push secret to remote\n");
             printf("q:                                              quit\n");
+            break;
+        case 'c':
+            scanf("%d %d %d ", &from, &to, &perc_cap);
+
+            // Produce
+            if ((status = ecall_produce_cancer_data(g_consumer_enclave_id, (int *)&ret, cancer_dataset, from, to, perc_cap, output_data, &data_size, 160000, 2)) != SGX_SUCCESS) {
+				printf("ERROR: ecall_produce_cancer_data failed with %d\n", status);
+                if_continue = false;
+                continue;
+			}
+            printf("INFO: ecall_produce_cancer_data returned %d\n", ret);
+            if (ret != 0) {
+                printf("ERROR: ecall_produce_cancer_data failed to produce data\n");
+                //if_continue = false;
+                continue;
+            }
+
+            scanf("%s", cmdbuffer);
+            // Open file
+            fp = fopen(cmdbuffer, "w+");
+            if (fp == NULL) {
+                printf("Error: Failed to open file %s\n", cmdbuffer);
+                continue;
+            }
+            fwrite(output_data, data_size, 1, fp);
+            fclose(fp);
             break;
         case 'o':
             scanf("%s", cmdbuffer);
@@ -405,7 +495,7 @@ int main(int argc, char *argv[])
                 free(input_file_buffer);
                 continue;
             }
-            printf("INFO: output_data's max size is set to %d\n", input_size + 8196);
+            printf("INFO: output_data's max size is set to %ld\n", input_size + 8196);
 
             // Produce
             if ((status = ecall_pack_data(g_consumer_enclave_id, (int *)&ret, input_file_buffer, input_size, output_data, &data_size, input_size + 8196, rule_mask)) != SGX_SUCCESS) {

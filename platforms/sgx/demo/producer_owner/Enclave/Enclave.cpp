@@ -57,6 +57,7 @@ extern "C" {
 
 #include "policy_disc.h"
 #include "user_data.h"
+#include "svm_data.h"
 #include "attestation/sgx_challenger.h"
 }
 
@@ -151,7 +152,7 @@ extern "C" int ecall_produce_data(uint64_t *numbers, uint64_t number_count, void
 	input_data_size = sizeof(user_data_t) + number_count * sizeof(uint64_t);
 	input_data = (user_data_t *)malloc(input_data_size);
 	if (input_data == NULL) {
-		printf("ERROR: Consumer Enclave: Failed to allocate policy\n");
+		printf("ERROR: Consumer Enclave: Failed to allocate input data\n");
 		return PCD_MEMERR;
 	}
 	printf("[+] number_count = %ld\n", number_count);
@@ -181,6 +182,113 @@ extern "C" int ecall_produce_data(uint64_t *numbers, uint64_t number_count, void
 				(void *)&(demo_rules[i]), sizeof(pcd_demo_policy_rule_t));
 		}
 	}
+
+	memcpy((void *)&policy->type, (void *)&pcd_demo_policy_type, sizeof(pcd_policy_type_t));
+	policy->policy_size = rule_count * sizeof(pcd_demo_policy_rule_t);
+
+	// Attributes
+	memcpy((void *)&attributes.custodian_id, &owner_id, sizeof(pcd_identity_t));
+	attributes.number_of_entries = number_count;
+
+	// Generate data
+	status = pcd_generate_data((void *)input_data, input_data_size,
+				&owner_id,
+				&delegator_addr,
+				policy,
+				NULL, 0, // No tags
+				&attributes, sizeof(pcd_demo_attribute_t),
+				PCD_CRYPTO_AES_GCM,
+				&enc_data);
+	if (status != PCD_OK) {
+		printf("ERROR: Producer Enclave: Failed to produce data with %d\n", status);
+		free(input_data);
+		free(policy);
+		return status;
+	}
+
+	data_size = sizeof(pcd_enc_data_t) + enc_data->enc_size;
+	if (data_size > max_size) {
+		printf("ERROR: Producer Enclave: Failed to produce data due to size overflow\n");
+		free(enc_data);
+		free(input_data);
+		free(policy);
+		return 1;
+	}
+
+	memcpy(output_data, enc_data, data_size);
+	*output_size = data_size;
+
+	free(enc_data);
+	free(input_data);
+	free(policy);
+
+	return 0;
+}
+
+extern "C" int ecall_produce_cancer_data(double *raw_dataset, int from, int to, int perc_cap, void *output_data, size_t *output_size, size_t max_size, uint8_t rule_mask) {
+	int status;
+	pcd_enc_data_t *enc_data;
+	size_t data_size;
+	svm_data_t *input_data;
+	size_t input_data_size;
+	pcd_demo_attribute_t attributes;
+	int number_count = to - from + 1;
+
+	int rule_count = 0;
+	int i, j;
+
+	if (to < from || to >= 569 || from < 0) {
+		printf("ERROR: to/from out of range\n");
+		return PCD_OUT_OF_RANGE;
+	}
+
+	// Input data
+	input_data_size = sizeof(svm_data_t) + number_count * sizeof(double) * 31;
+	input_data = (svm_data_t *)malloc(input_data_size);
+	if (input_data == NULL) {
+		printf("ERROR: Consumer Enclave: Failed to allocate input data\n");
+		return PCD_MEMERR;
+	}
+	printf("[+] number_count = %d\n", number_count);
+	input_data->record_count = number_count;
+	input_data->feature_vector_length = 30;
+	for (i = 0; i < number_count; i++) {
+		// label
+		input_data->numbers[number_count * 30 + i] = raw_dataset[(from + i) * 31];
+		printf("%lf ", raw_dataset[(from + i) * 31]);
+		for (j = 0; j < 30; j++) {
+			input_data->numbers[30 * i + j] = raw_dataset[(from + i) * 31 + (j + 1)];
+		}
+	}
+	printf("[+] Copied dataset\n");
+
+	// Policy
+	for (i = 0; i < 3; i++) {
+		if ((rule_mask & (0x01 << i)) != 0) {
+			rule_count += 1;
+		}
+	}
+	printf("[+] rule_count = %d\n", rule_count);
+
+	policy = (pcd_policy_t *)malloc(sizeof(pcd_policy_t) + rule_count * sizeof(pcd_demo_policy_rule_t));
+	if (policy == NULL) {
+		printf("ERROR: Consumer Enclave: Failed to allocate policy\n");
+		free(input_data);
+		return PCD_MEMERR;
+	}
+	printf("[+] policy allcated\n");
+
+	demo_rules[1].entry_cap_percentage = perc_cap;
+	j = 0;
+	for (i = 0; i < 3; i++) {
+		if ((rule_mask & (0x01 << i)) != 0) {
+			memcpy((void *)(policy->policy_buffer + j * sizeof(pcd_demo_policy_rule_t)), 
+				(void *)&(demo_rules[i]), sizeof(pcd_demo_policy_rule_t));
+			j += 1;
+		}
+	}
+	// Revert for other usages
+	demo_rules[1].entry_cap_percentage = 70;
 
 	memcpy((void *)&policy->type, (void *)&pcd_demo_policy_type, sizeof(pcd_policy_type_t));
 	policy->policy_size = rule_count * sizeof(pcd_demo_policy_rule_t);
@@ -262,7 +370,7 @@ extern "C" int ecall_pack_data(void *input_data, size_t input_data_size, void *o
 	attributes.number_of_entries = 0;
 
 
-	printf("INFO: input_data_size = %d\n", input_data_size);
+	printf("INFO: input_data_size = %ld\n", input_data_size);
 	// Generate data
 	status = pcd_generate_data((void *)input_data, input_data_size,
 				&owner_id,
