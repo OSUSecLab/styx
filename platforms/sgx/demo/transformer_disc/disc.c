@@ -113,26 +113,81 @@ int eval(pcd_payload_t **payload_ptr_array, uint32_t payload_amount) {
 				}
 				break;
 			case PCD_DEMO_POLICY_TYPE_CUSTODIAN:
-				owner_entry_total = 0;
-				for (k = 0; k < payload_amount; k++) {
-					// Count total
-					if (!pcd_compare_identity(&attributes_array[i]->custodian_id, &attributes_array[k]->custodian_id)) {
-						owner_entry_total += attributes_array[k]->number_of_entries;
-					}
-				}
-				if (owner_entry_total > rules_array[i][j].custodian_info.entry_amount) {
-					if (pcd_compare_identity(&attributes_array[i]->custodian_id, &output_custodian)) {
-						printf("[-] DISC: ERROR: Program output custodian unmet on data %d\n", i);
-						printf("                 owner_entry_total/cap = %d/%d\n", owner_entry_total, rules_array[i][j].custodian_info.entry_amount);
-						printf("                 Real output custodian    :");
-						pcd_policy_disc_print_id(&output_custodian);
-						printf("\n");
-						printf("                 Expected output custodian:");
-						pcd_policy_disc_print_id(&attributes_array[i]->custodian_id);
-						printf("\n");
-						ret_val = PCD_DENINED;
-						goto fail;
-					}
+				// Don't care. Check for output.
+				break;
+			default:
+				ret_val = PCD_POLICY_NSUPPORT;
+				goto fail;
+			}
+		}
+	}
+fail:
+	free(policy_array);
+	free(policy_rule_count_array);
+	free(rules_array);
+	free(attributes_array);
+
+	return ret_val;
+}
+
+__attribute__((export_name("eval_output")))
+int eval_output(pcd_payload_t **payload_ptr_array, uint32_t payload_amount, 
+		void *data, size_t data_size,
+		pcd_identity_t *data_owner_id,
+		pcd_policy_t *policy,
+		void *attributes, size_t attribute_size) {
+	int i = 0;
+	int j, k;
+	uint32_t ret_val = PCD_OK;
+	uint32_t entry_total; 
+	uint32_t owner_entry_total;
+
+	pcd_payload_t *payload_ptr;
+	pcd_sha256_t real_program_hash;
+	pcd_identity_t output_custodian;
+
+	if (pcd_get_program_hash(&real_program_hash)) {
+		return PCD_RUNTIME_ERR;
+	}
+
+	if (pcd_get_output_custodian(&output_custodian)) {
+		return PCD_RUNTIME_ERR;
+	}
+
+	policy_array = (pcd_policy_t **)malloc(sizeof(pcd_policy_t *) * payload_amount);
+	policy_rule_count_array = (uint32_t *)malloc(sizeof(uint32_t) * payload_amount);
+	rules_array = (pcd_demo_policy_rule_t **)malloc(sizeof(pcd_demo_policy_rule_t *) * payload_amount);
+	attributes_array = (pcd_demo_attribute_t **)malloc(sizeof(pcd_demo_attribute_t *) * payload_amount);
+
+	// First load all address into the arries
+	for (i = 0; i < payload_amount; i++) {
+		// Load policy-related data
+		payload_ptr = payload_ptr_array[i];
+		policy_array[i] = (pcd_policy_t *)(payload_ptr->payload + payload_ptr->data_size);
+		policy_rule_count_array[i] = policy_array[i]->policy_size / sizeof(pcd_demo_policy_rule_t);
+		rules_array[i] = (pcd_demo_policy_rule_t *)(policy_array[i]->policy_buffer);
+		attributes_array[i] = (pcd_demo_attribute_t *)(payload_ptr->payload + payload_ptr->data_size + payload_ptr->policy_size + payload_ptr->tag_size);
+	}
+
+	// Next check policy
+	for (i = 0; i < payload_amount; i++) {
+		for (j = 0; j < policy_rule_count_array[i]; j++) {
+			switch (rules_array[i][j].rule_type) {
+			case PCD_DEMO_POLICY_TYPE_PROGRAM_HASH:
+				// Don't care. Check for input.
+				break;
+			case PCD_DEMO_POLICY_TYPE_ENTRY_CAP:
+				// Don't care. Check for input.
+				break;
+			case PCD_DEMO_POLICY_TYPE_CUSTODIAN:
+				if (!pcd_compare_identity(data_owner_id, &rules_array[i][j].custodian_id)) {
+					printf("[-] DISC ERROR: Output custodian unmet.\n");
+					printf("                Expected: ");
+					pcd_policy_disc_print_id(&rules_array[i][j].custodian_id);
+					printf("                Got:      ");
+					pcd_policy_disc_print_id(data_owner_id);
+					ret_val = PCD_DENINED;
+					goto fail;
 				}
 				break;
 			default:
@@ -146,6 +201,10 @@ fail:
 	free(policy_rule_count_array);
 	free(rules_array);
 	free(attributes_array);
+	free(data);
+	free(data_owner_id);
+	free(policy);
+	free(attributes);
 
 	return ret_val;
 }

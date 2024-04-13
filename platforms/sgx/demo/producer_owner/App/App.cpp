@@ -307,23 +307,36 @@ int main(int argc, char *argv[])
     int from, to, perc_cap;
 
     char *uuid_path;
+    char *output_uuid_path;
     char *hash_path;
 
     uint8_t *owner_id;
+    uint8_t *output_owner_id;
     uint8_t *program_hash;
     size_t read_buffer_size;
 
-    if (argc != 3) {
-	    printf("usage: producer_owner <uuid path> <hash path>\n");
+    if (argc != 4) {
+	    printf("usage: producer_owner <uuid path> <output uuid path> <hash path>\n");
 		return -1;
     }
 
     uuid_path = argv[1];
-    hash_path = argv[2];
+    output_uuid_path = argv[2];
+    hash_path = argv[3];
 
     owner_id = (uint8_t *)read_file_to_buffer(uuid_path, &read_buffer_size);
     if (owner_id == NULL) {
         printf("ERROR: Failed to read owner UUID\n");
+        return -1;
+    }
+    if (read_buffer_size != sizeof(uuid_t)) {
+        printf("ERROR: UUID size incorrect! read_buffer_size = %ld\n", read_buffer_size);
+        return -1;
+    }
+
+    output_owner_id = (uint8_t *)read_file_to_buffer(output_uuid_path, &read_buffer_size);
+    if (output_owner_id == NULL) {
+        printf("ERROR: Failed to read output custodian UUID\n");
         return -1;
     }
     if (read_buffer_size != sizeof(uuid_t)) {
@@ -351,7 +364,7 @@ int main(int argc, char *argv[])
     }
 
     // Initalise the environment
-	ecall_init_env(g_consumer_enclave_id, owner_id, program_hash);
+	ecall_init_env(g_consumer_enclave_id, owner_id, output_owner_id, program_hash);
     free(owner_id);
     free(program_hash);
 

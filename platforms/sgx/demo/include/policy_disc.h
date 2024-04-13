@@ -20,10 +20,7 @@ typedef struct _pcd_demo_policy_rule_t {
 	union {
 		pcd_sha256_t program_hash;
 		uint32_t entry_cap_percentage;
-		struct {
-			pcd_identity_t custodian_id;
-			uint32_t entry_amount;
-		} custodian_info;
+		pcd_identity_t custodian_id;
 	};
 } __attribute__((packed)) pcd_demo_policy_rule_t;
 

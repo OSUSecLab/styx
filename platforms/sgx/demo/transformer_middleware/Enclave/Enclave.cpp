@@ -277,7 +277,7 @@ pcd_runtime_pointer_t svm_dataset_to_problem(wasm_exec_env_t exec_env, pcd_runti
 		goto error_out;
 	}
 	prob->l = total_record_count;
-	printf("[?] INFO: total records: %d\n", total_record_count);
+	//printf("[?] INFO: total records: %d\n", total_record_count);
 	prob->y = (double *)malloc(sizeof(double) * total_record_count);
 	if (prob->y == NULL) {
 		printf("Error: svm_dataset_to_problem: failed to allocate prob->y\n");
@@ -364,6 +364,7 @@ static struct native_symbol {
 	{ "svm_free_param", 		(void*)svm_free_param,			"(*)" },
 	{ "svm_free_problem", 		(void*)svm_free_problem,		"(*)" },
 	{ "svm_dataset_to_problem", 	(void*)svm_dataset_to_problem,		"(***ii*)i" },
+	{ "svm_save_model", 		(void*)svm_save_model,			"(Ii*)i" },
 #endif
 };
 }

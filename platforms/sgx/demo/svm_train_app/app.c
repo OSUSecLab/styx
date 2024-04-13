@@ -5,10 +5,12 @@
 
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 
 #include <errno.h>
 
 #include "svm_data.h"
+#include "policy_disc.h"
 
 #include "identity.h"
 
@@ -16,7 +18,21 @@
 #include "dataset.h"
 #include "error_codes.h"
 
+#include "data_generator_consumer.h"
+
+uint64_t time_discrepancy;
+
+static inline uint64_t time_get(void)
+{
+	struct timeval tv;
+
+	gettimeofday(&tv, 0);
+	return (uint64_t)(tv.tv_sec * 1000000000ULL + tv.tv_usec * 1000);
+}
+
 extern char *read_file_to_buffer(const char *filename, size_t *ret_size);
+
+pcd_identity_t *owner_id = NULL;
 
 char cmdbuffer[100];
 
@@ -35,6 +51,10 @@ int svm_check_parameter(void *prob, void *param);
 void svm_free_and_destroy_model(uint64_t *model_ptr_ptr);
 void svm_destroy_param(void *param);
 uint64_t svm_train(void *prob, void *param);
+char *svm_save_model(uint64_t model_ptr, int feature_length, int *saved_size);
+
+#define STATIC_DELEGATOR_ADDR "/tmp/UNIX0.domain"
+static pcd_delegator_addr_t delegator_addr = STATIC_DELEGATOR_ADDR;
 
 void process_data_and_output(uint32_t dataset_index, uint32_t data_count) {
 	int i;
@@ -50,6 +70,12 @@ void process_data_and_output(uint32_t dataset_index, uint32_t data_count) {
 	uint64_t model_native_ptr; 
 	int feature_vector_length = -1;
 	int param_err;
+	char *saved_model;
+	int saved_size;
+	pcd_policy_t *policy = NULL;
+	pcd_demo_attribute_t attributes;
+	pcd_demo_policy_rule_t demo_rule;
+	int status;
 
 	for (i = 0; i < data_count; i++) {
 		payload = (pcd_payload_t *)pcd_dataset_access(dataset_index, i);
@@ -61,7 +87,7 @@ void process_data_and_output(uint32_t dataset_index, uint32_t data_count) {
 		}
 
 		svm_data = (svm_data_t *)payload->payload;
-		printf("[+] WASM App: DEBUG: Data %d has %llu records\n", i, svm_data->record_count);
+		//printf("[+] WASM App: DEBUG: Data %d has %llu records\n", i, svm_data->record_count);
 		if (payload->data_size != (svm_data->record_count * (sizeof(double) * (svm_data->feature_vector_length + 1))+ sizeof(svm_data_t))) {
 			printf("[-]  size mismatch!\n");
 			return;
@@ -69,7 +95,7 @@ void process_data_and_output(uint32_t dataset_index, uint32_t data_count) {
 		else {
 			if (feature_vector_length == -1) {
 				feature_vector_length = svm_data->feature_vector_length;
-				printf("[!] feature_vector_length = %d\n", feature_vector_length);
+				//printf("[!] feature_vector_length = %d\n", feature_vector_length);
 			}
 
 			if (svm_data->feature_vector_length != feature_vector_length) {
@@ -115,6 +141,45 @@ void process_data_and_output(uint32_t dataset_index, uint32_t data_count) {
 		svm_free_problem(problem);
 	}
 
+	// Save model
+	saved_model = svm_save_model(model_native_ptr, feature_vector_length, &saved_size);
+	if (saved_model == NULL) {
+		printf("[-] Saved model is NULL\n");
+	}
+	else {
+		printf("[+] Saved size = %d\n", saved_size);
+	}
+
+	// A demo 1 rule policy
+	policy = (pcd_policy_t *)malloc(sizeof(pcd_policy_t) + sizeof(pcd_demo_policy_rule_t));
+	if (policy == NULL) {
+		printf("ERROR: Consumer Enclave: Failed to allocate policy\n");
+		goto error_fail_to_save;
+	}
+	demo_rule.rule_type = PCD_DEMO_POLICY_TYPE_CUSTODIAN;
+	memcpy(&demo_rule.custodian_id, owner_id, sizeof(pcd_identity_t));
+	memcpy((void *)(policy->policy_buffer), (void *)&(demo_rule), sizeof(pcd_demo_policy_rule_t));
+
+	memcpy((void *)&policy->type, (void *)&pcd_demo_policy_type, sizeof(pcd_policy_type_t));
+	policy->policy_size = sizeof(pcd_demo_policy_rule_t);
+
+	memcpy(&attributes.custodian_id, owner_id, sizeof(pcd_identity_t));
+	attributes.number_of_entries = 0;
+
+	status = pcd_consumer_generate_data((void *)saved_model, saved_size,
+				owner_id,
+				&delegator_addr,
+				policy,
+				NULL, 0, // No tags
+				&attributes, sizeof(pcd_demo_attribute_t),
+				PCD_CRYPTO_AES_GCM,
+				"../svm_model.model");
+	if (status != PCD_OK) {
+		printf("[-] ERROR: Failed to save model with %d\n", status);
+	}
+	printf("[+] INFO: Saved model to ../svm_model.model")
+
+error_fail_to_save:
 	for (i = 0; i < data_count; i++) {
 		builtin_free(free_list[i]);
 	}
@@ -149,8 +214,21 @@ int main() {
 	size_t enc_data_size;
 	uint32_t data_count = 0;
 	int i;
-	pcd_identity_t *owner_id = NULL;
 	size_t owner_id_size;
+
+	uint64_t time_diff[6];
+	
+
+	time_diff[0] = time_get();
+	time_diff[1] = time_get();
+	time_diff[2] = time_get();
+	time_diff[3] = time_get();
+	time_diff[4] = time_get();
+	time_diff[5] = time_get();
+	for (i = 0; i < 5; i++) {
+		time_discrepancy += time_diff[i + 1] - time_diff[i];
+	}
+	time_discrepancy /= 5;
 	
 	printf("Enter owner ID path: ");
 	fflush(stdout);
@@ -166,7 +244,7 @@ int main() {
 		return -1;
 	}
 
-	printf("[+] Owner ID set");
+	printf("[+] Owner ID set: ");
 	pcd_policy_disc_print_id(owner_id);
 	printf("\n");
 

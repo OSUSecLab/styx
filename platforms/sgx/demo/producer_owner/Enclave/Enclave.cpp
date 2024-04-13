@@ -414,7 +414,7 @@ extern "C" void ecall_change_owner_id(uint8_t *new_owner_id) {
 
 	// As a demo, we use the same secret for everyone...
 	pcd_secret_register(&owner_id, secret);
-	memcpy((void *)&demo_rules[2].custodian_info.custodian_id, (void *)&owner_id, sizeof(pcd_identity_t));
+	memcpy((void *)&demo_rules[2].custodian_id, (void *)&owner_id, sizeof(pcd_identity_t));
 }
 
 
@@ -422,7 +422,7 @@ extern "C" void ecall_change_target_hash(uint8_t *target_program_hash) {
 	memcpy((void *)&demo_rules[0].program_hash, (void *)&target_program_hash, sizeof(pcd_sha256_t));
 }
 
-extern "C" void ecall_init_env(uint8_t *input_owner_id, uint8_t *target_program_hash) {
+extern "C" void ecall_init_env(uint8_t *input_owner_id, uint8_t *output_owner_id, uint8_t *target_program_hash) {
 	pcd_crypto_init();
 	set_enclave_trust_verifier(&verify_peer_trust);
 
@@ -442,6 +442,5 @@ extern "C" void ecall_init_env(uint8_t *input_owner_id, uint8_t *target_program_
 	demo_rules[1].rule_type = PCD_DEMO_POLICY_TYPE_ENTRY_CAP;
 	demo_rules[1].entry_cap_percentage = 70;
 	demo_rules[2].rule_type = PCD_DEMO_POLICY_TYPE_PROGRAM_HASH;
-	memcpy((void *)&demo_rules[2].custodian_info.custodian_id, (void *)&owner_id, sizeof(pcd_identity_t));
-	demo_rules[2].custodian_info.entry_amount = 2;
+	memcpy((void *)&demo_rules[2].custodian_id, (void *)&owner_id, sizeof(pcd_identity_t));
 }
