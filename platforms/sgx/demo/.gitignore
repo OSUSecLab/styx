@@ -2,3 +2,4 @@
 input_3
 mnist.onnx
 *.dat
+*.model
