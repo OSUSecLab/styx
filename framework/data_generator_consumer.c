@@ -8,6 +8,23 @@
 #include "log.h"
 #include "error_codes.h"
 
+#include "policy/policy.h"
+
+extern pcd_dataset_t *pcd_get_current_active_dataset();
+
+uint32_t pcd_consumer_generator_check_policy(void *data, size_t data_size,
+					pcd_identity_t *data_owner_id,
+					pcd_policy_t *policy,
+					void *attributes, uint64_t attribute_size) {
+	pcd_dataset_t *dataset = pcd_get_current_active_dataset();
+
+	if (dataset == NULL) {
+		return PCD_NOT_FOUND;
+	}
+
+	return pcd_policy_eval_output_over_dataset(dataset, data, data_size, data_owner_id, policy, attributes, attribute_size);
+}
+
 int pcd_consumer_generate_data(void *data, size_t data_size,
 				pcd_identity_t *data_owner_id,
 				pcd_delegator_addr_t *delegator_addr,
@@ -24,7 +41,7 @@ int pcd_consumer_generate_data(void *data, size_t data_size,
 	if ((data == NULL && data_size != 0) || data_owner_id == NULL || delegator_addr == NULL
 	    || (policy == NULL) || (tags == NULL && tag_count != 0)
 	    || (attributes == NULL && attribute_size != 0)) {
-		pcd_log_error("ERROR: pcd_generate_data: Parameter is NULL\n");
+		pcd_log_error("ERROR: pcd_consumer_generate_data: Parameter is NULL\n");
 		return PCD_NULL_ARG;
 	}
 
@@ -32,6 +49,13 @@ int pcd_consumer_generate_data(void *data, size_t data_size,
 	status = pcd_secret_retrieve(data_owner_id, &secret);
 	if(status != PCD_OK) {
 		return status;
+	}
+
+	status = pcd_consumer_generator_check_policy(data, data_size,
+					data_owner_id, policy,
+					attributes, attribute_size);
+	if (status != PCD_OK) {
+		pcd_log_error("ERROR: pcd_consumer_generate_data: policy check failed with %d\n", status);
 	}
 
 	status = pcd_data_packer_generate_data(data, data_size, data_owner_id,

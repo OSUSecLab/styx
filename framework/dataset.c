@@ -18,6 +18,17 @@
 static char pcd_dataset_occupied[PCD_MAX_AMOUNT_DATASET] = { 0 };
 static pcd_dataset_t *pcd_datasets[PCD_MAX_AMOUNT_DATASET] = { NULL };
 
+static int pcd_dataset_current = -1;
+
+pcd_dataset_t *pcd_get_current_active_dataset() {
+	if (pcd_dataset_current < 0) {
+		return NULL;
+	}
+	else {
+		return pcd_datasets[pcd_dataset_current];
+	}
+}
+
 uint32_t pcd_dataset_new(uint32_t dataset_max_size) {
 	int i;
 
@@ -118,13 +129,18 @@ uint32_t pcd_dataset_add_data(uint32_t dataset_index, pcd_enc_data_t *input_data
 }
 
 uint32_t pcd_dataset_check_policy(uint32_t dataset_index, pcd_identity_t *program_owner_id) {
+	uint32_t passed = 0;
 	//pcd_log("DEBUG: Entering pcd_dataset_check_policy. dataset_index = %d\n", dataset_index);
 	if (pcd_dataset_occupied[dataset_index] == 0) {
 		pcd_log_error("ERROR: Dataset %d is not in use\n", dataset_index);
 		return PCD_NOT_FOUND;
 	}
 
-	return pcd_policy_eval_over_dataset(pcd_datasets[dataset_index], program_owner_id);
+	passed = pcd_policy_eval_over_dataset(pcd_datasets[dataset_index], program_owner_id);
+	if (passed == PCD_OK)
+		pcd_dataset_current = dataset_index;
+	return passed;
+
 }
 
 pcd_runtime_pointer_t pcd_dataset_access(uint32_t dataset_index, uint32_t data_index) {
