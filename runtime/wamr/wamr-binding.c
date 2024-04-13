@@ -84,6 +84,68 @@ static NativeSymbol pcd_data_generator_native_symbols[] =
 
 #endif
 
+extern sgx_status_t ocall_open(int* retval, const char* pathname, int flags, bool has_mode, unsigned int mode);
+extern sgx_status_t ocall_fstat(int* retval, int fd, void* buf, unsigned int buf_len);
+extern sgx_status_t ocall_close(int* retval, int fd);
+extern sgx_status_t ocall_read_file_to_outside_buffer(char** ret_buffer, int file, size_t file_size, size_t* read_size);
+extern sgx_status_t ocall_write_file_to_outside(int file, char *buffer, size_t write_size);
+
+#ifdef PCD_CONFIG_CONSUMER_DATA_GENERATOR
+
+#include "data_generator_consumer_internal.h"
+
+#define	S_IRUSR	0000400
+#define	S_IWUSR	0000200
+#define	S_IRGRP	0000040
+#define	S_IWGRP	0000020
+#define S_IROTH 0000004
+
+int pcd_consumer_generate_data_wrapper(wasm_exec_env_t exec_env, void *data, size_t data_size,
+			pcd_identity_t *data_owner_id,
+			pcd_delegator_addr_t *delegator_addr,
+			pcd_policy_t *policy,
+			pcd_tag_t *tags, uint32_t tag_count,
+			void *attributes, uint32_t attribute_size,
+			pcd_crypto_algo_t crypto_algo,
+			const char *output_path) {
+	wasm_module_inst_t instance = NULL;
+	pcd_enc_data_t *encrypted_data = NULL;
+	int ret_val;
+	uint32_t output_data_ptr;
+	int file = -1;
+
+	ret_val = pcd_consumer_generate_data(data, data_size, data_owner_id, delegator_addr, policy, 
+					tags, tag_count, attributes, attribute_size, crypto_algo,
+					&encrypted_data);
+	if (ret_val != PCD_OK) {
+		pcd_log_error("ERROR: Failed to generate data\n");
+		return ret_val;
+	}
+
+	// output_path
+	ocall_open(&file, output_path, O_RDWR | O_CREAT, true, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
+    	if (file < 0) {
+    	    pcd_log_error("ERROR: Write file failed: open file %s failed.\n", output_path);
+	    free(encrypted_data);
+    	    return -1;
+    	}
+	
+	ocall_write_file_to_outside(file, (char *)encrypted_data, sizeof(pcd_enc_data_t) + encrypted_data->enc_size);
+
+    	ocall_close(&ret_val, file);
+
+	free(encrypted_data);
+
+	return ret_val;
+}
+
+static NativeSymbol pcd_consumer_data_generator_native_symbols[] = 
+{
+    { "pcd_consumer_generate_data", 	pcd_consumer_generate_data_wrapper, 	"(*~****i*~i$)i" }
+};
+
+#endif
+
 #ifdef PCD_CONFIG_POLICY_ENGINE
 
 #include "policy/policy_engine_helpers.h"
@@ -177,7 +239,7 @@ static NativeSymbol pcd_debug_native_symbols[] =
     { "read_file_to_buffer", 		pcd_read_file_to_buffer, 		"(**)i" }
 };
 
-void
+int
 ocall_print(const char *str);
 
 uint32_t pcd_runtime_setup_environment() {
@@ -187,6 +249,10 @@ uint32_t pcd_runtime_setup_environment() {
 
 #ifdef PCD_CONFIG_DATA_GENERATOR
 	int pcd_data_generator_n_native_symbols;
+#endif
+
+#ifdef PCD_CONFIG_CONSUMER_DATA_GENERATOR
+	int pcd_consumer_data_generator_n_native_symbols;
 #endif
 
 #ifdef PCD_CONFIG_POLICY_ENGINE
@@ -215,6 +281,15 @@ uint32_t pcd_runtime_setup_environment() {
 		goto fail;
 	}
 #endif
+
+#ifdef PCD_CONFIG_CONSUMER_DATA_GENERATOR
+	pcd_consumer_data_generator_n_native_symbols = sizeof(pcd_consumer_data_generator_native_symbols) / sizeof(NativeSymbol);
+	if (!wasm_runtime_register_natives("env", pcd_consumer_data_generator_native_symbols, pcd_consumer_data_generator_n_native_symbols)) {
+		pcd_log_error("ERROR: pcd_runtime_setup_environment: Failed to register native symbols for consumer data generator\n");
+		goto fail;
+	}
+#endif
+
 
 #ifdef PCD_CONFIG_POLICY_ENGINE
 	pcd_policy_engine_n_native_symbols = sizeof(pcd_policy_engine_native_symbols) / sizeof(NativeSymbol);
