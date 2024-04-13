@@ -1,4 +1,4 @@
-extern void ocall_print(const char *string);
+extern int ocall_print(const char *string);
 
 void pcd_print(const char *string) {
 	ocall_print(string);

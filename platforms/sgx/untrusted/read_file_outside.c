@@ -18,6 +18,10 @@ void ocall_read_file_to_outside_buffer(char **ret_buffer, int file, size_t file_
 	*ret_buffer = buffer;
 }
 
+void ocall_write_file_to_outside(int file, char *buffer, size_t write_size) {
+	write(file, buffer, write_size);
+}
+
 void ocall_free_outside_buffer(char *outside_buffer) {
 	free(outside_buffer);
 }

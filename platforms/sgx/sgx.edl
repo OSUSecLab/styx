@@ -41,6 +41,7 @@ enclave {
 	uint32_t ocall_end_session(uint32_t session_id, [in, string] const char *target_path);
 
     void ocall_read_file_to_outside_buffer([out] char **ret_buffer, int file, size_t file_size, [out] size_t *read_size);
+    void ocall_write_file_to_outside(int file, [in, size = write_size] char *buffer, size_t write_size);
     void ocall_free_outside_buffer([user_check] char *outside_buffer);
     };
 
