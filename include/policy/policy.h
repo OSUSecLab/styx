@@ -30,4 +30,10 @@ typedef struct _pcd_policy_disc_t {
 int pcd_policy_eval_over_dataset(pcd_dataset_t *dataset, pcd_identity_t *program_owner_id);
 int pcd_policy_load_disc(char *module_buffer, size_t module_size, pcd_policy_type_t *type);
 
+int pcd_policy_eval_output_over_dataset(pcd_dataset_t *dataset,
+					void *data, size_t data_size,
+					pcd_identity_t *data_owner_id,
+					pcd_policy_t *policy,
+					void *attributes, uint64_t attribute_size);
+
 #endif
