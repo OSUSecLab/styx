@@ -1,5 +1,5 @@
-#ifndef _PCD_DATA_GENERATOR_H_
-#define _PCD_DATA_GENERATOR_H_
+#ifndef _PCD_CONSUMER_DATA_GENERATOR_H_
+#define _PCD_CONSUMER_DATA_GENERATOR_H_
 
 #include "data.h"
 #include "tag.h"
@@ -8,7 +8,7 @@
 #include "policy/policy_def.h"
 #include "crypto/crypto.h"
 
-int pcd_generate_data(void *data, size_t data_size,
+int pcd_consumer_generate_data(void *data, size_t data_size,
 				pcd_identity_t *data_owner_id,
 				pcd_delegator_addr_t *delegator_addr,
 				pcd_policy_t *policy,
