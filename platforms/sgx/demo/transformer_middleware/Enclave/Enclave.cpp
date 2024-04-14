@@ -217,7 +217,7 @@ pcd_runtime_pointer_t svm_new_param(wasm_exec_env_t exec_env) {
 	param->nu = 0.5;
 	param->cache_size = 100;
 	param->C = 1;
-	param->eps = 1e-3;
+	param->eps = 1e-8;
 	param->p = 0.1;
 	param->shrinking = 1;
 	param->probability = 0;
