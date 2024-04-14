@@ -76,9 +76,12 @@ void process_data_and_output(uint32_t dataset_index, uint32_t data_count) {
 	pcd_demo_attribute_t attributes;
 	pcd_demo_policy_rule_t demo_rule;
 	int status;
+	uint64_t time_start;
+	uint64_t time_end;
 
 	for (i = 0; i < data_count; i++) {
 		payload = (pcd_payload_t *)pcd_dataset_access(dataset_index, i);
+		time_start = time_get();
 		free_list[i] = payload;
 		data_accessor = (uint8_t *)payload;
 		if (payload == NULL) {
@@ -108,9 +111,12 @@ void process_data_and_output(uint32_t dataset_index, uint32_t data_count) {
 				record_counts[i] = (int)(svm_data->record_count);
 			}
 		}
+
+		time_end = time_get() - time_discrepancy;
+		printf("[!] Add to training set cost %llu\n", time_end - time_start);
 	}
 
-
+	time_start = time_get();
 	// New param
 	param = svm_new_param();
 	if (param == NULL) {
@@ -132,16 +138,22 @@ void process_data_and_output(uint32_t dataset_index, uint32_t data_count) {
 		svm_free_param(param);
 		return;
 	}
+	time_end = time_get() - time_discrepancy;
+	printf("[!] Initialisation cost %llu\n", time_end - time_start);
 
 	// Train model
+	time_start = time_get();
 	model_native_ptr = svm_train(problem, param);
 	if (model_native_ptr == 0) {
 		printf("[-] model is NULL\n");
 		svm_free_param(param);
 		svm_free_problem(problem);
 	}
+	time_end = time_get() - time_discrepancy;
+	printf("[!] Training cost %llu\n", time_end - time_start);
 
 	// Save model
+	time_start = time_get();
 	saved_model = svm_save_model(model_native_ptr, feature_vector_length, &saved_size);
 	if (saved_model == NULL) {
 		printf("[-] Saved model is NULL\n");
@@ -149,8 +161,11 @@ void process_data_and_output(uint32_t dataset_index, uint32_t data_count) {
 	else {
 		printf("[+] Saved size = %d\n", saved_size);
 	}
+	time_end = time_get() - time_discrepancy;
+	printf("[!] Model serialisation cost %llu\n", time_end - time_start);
 
 	// A demo 1 rule policy
+	time_start = time_get();
 	policy = (pcd_policy_t *)malloc(sizeof(pcd_policy_t) + sizeof(pcd_demo_policy_rule_t));
 	if (policy == NULL) {
 		printf("ERROR: Consumer Enclave: Failed to allocate policy\n");
@@ -177,9 +192,13 @@ void process_data_and_output(uint32_t dataset_index, uint32_t data_count) {
 	if (status != PCD_OK) {
 		printf("[-] ERROR: Failed to save model with %d\n", status);
 	}
-	printf("[+] INFO: Saved model to ../svm_model.model")
+	time_end = time_get() - time_discrepancy;
+	printf("[!] Model PAD generation cost %llu\n", time_end - time_start);
+
+	printf("[+] INFO: Saved model to ../svm_model.model");
 
 error_fail_to_save:
+	time_start = time_get();
 	for (i = 0; i < data_count; i++) {
 		builtin_free(free_list[i]);
 	}
@@ -188,6 +207,9 @@ error_fail_to_save:
 	svm_destroy_param(param);
 	svm_free_param(param);
 	svm_free_problem(problem);
+
+	time_end = time_get() - time_discrepancy;
+	printf("[!] Cleanup cost %llu\n", time_end - time_start);
 
 	printf("[+] WASM App: DEBUG: Done training\n");
 }
