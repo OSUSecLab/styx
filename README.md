@@ -1,4 +1,4 @@
-# Policy-Carrying Data
+# Styx Artefacts
 
 
 ## How to build the `libonnx` demo with SGX and WAMR
