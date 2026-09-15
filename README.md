@@ -9,7 +9,7 @@ While the Styx framework can be extended to support more TEEs (or without any TE
 
 Build [Intel SGX SDK](https://github.com/intel/linux-sgx) and install the SDK, PSW. The reference commit for this project is `f47d0e5a01bf68cebefce4418cf364777e76d503` (Version 2.21). Prepare your system for DCAP following [this guide](https://www.intel.com/content/www/us/en/developer/articles/guide/intel-software-guard-extensions-data-center-attestation-primitives-quick-install-guide.html).
 
-Download a [WASI SDK](https://github.com/WebAssembly/wasi-sdk) to build WASM apps. The reference version iw WASI SDK 20. Note that you don't have to complile it. Just download from the release page.
+Download a [WASI SDK](https://github.com/WebAssembly/wasi-sdk) to build WASM apps. The reference version iw [WASI SDK 20](https://github.com/WebAssembly/wasi-sdk/releases/tag/wasi-sdk-20). Note that you don't have to complile it. Just download from the release page.
 
 ### Step 1. Clone the repo and pull submodules
 
