@@ -3,7 +3,7 @@
 
 ## How to build the `libonnx` demo with SGX and WAMR
 
-While the PCD framework can be extended to support more TEEs (or without any TEE) and runtimes, we provide only SGX and WAMR support out of the box. Here is how to build it and how to run it. Suppose you are at `~`
+While the Styx framework can be extended to support more TEEs (or without any TEE) and runtimes, we provide only SGX and WAMR support out of the box. Here is how to build it and how to run it. Suppose you are at `~`
 
 ### Step 0. Prepare the environment
 
@@ -140,7 +140,7 @@ You will see a bunch of output
 INFO: secret size is 16
 INFO: b8bcb13f-3f74-ee11-9147-e329dfb08d79 secret registered
 [+] Middleware: INFO: Secret registered
-DEBUG: dir_allow: /home/nskernel/pcd/platforms/sgx/demo/
+DEBUG: dir_allow: /home/.../pcd/platforms/sgx/demo/
 Enter owner ID path: INFO: buf_size = 16
 [+] Owner ID setb8bcb13f-3f74-ee11-9147-e329dfb08d79
 Enter model path: INFO: buf_size = 26679
@@ -148,7 +148,7 @@ Enter input path:
 INFO: buf_size = 3361
 [+] Dataset 0 ready
 ```
-Now, enter the model's path. Note that we need the PCD encrypted one.
+Now, enter the model's path. Note that we need the PAD encrypted one.
 ```
 ../mnist.onnx
 ```
