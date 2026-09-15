@@ -56,6 +56,8 @@ make
 
 ### Step 5. Build the DISC (policy engine)
 
+Note that we used to refer the policy language (and its engine) with the name 'DISC'. This is a legacy name.
+
 Keep the `config.mk` as the one you use for the transformer middleware,
 ```
 cd platform/sgx/demo/transformer_disc
